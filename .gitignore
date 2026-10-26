@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-artifact
+.env
+.env.local
+.firebaserc
+*-debug.log
+.firebase
+_respaldo-antes-firebase

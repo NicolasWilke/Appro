@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"], "lib": ["ES2022", "DOM"], "module": "ESNext", "target": "ES2022" },
+  "include": ["server", "src/domain", "src/config", "src/data/mock/seed.ts"]
+}

@@ -1,0 +1,54 @@
+/* Layout: aplicación con cabecera fija y columnas de trabajo; la "ficha" con sello es la pieza central.
+   Marca APPRO: Montserrat y la paleta de la hoja de marca. */
+/* Paleta APPRO (hoja de marca): marino #0B2D5B, azul #1E88E5, verde #00C853, gris claro #E8EEF5.
+   El azul y el verde de marca no alcanzan contraste AA como texto sobre blanco: para texto y botones
+   se usan #1565C0 y #00873A; los tonos puros quedan para acentos y el logo. */
+:root {
+  --papel: #E8EEF5;
+  --superficie: #FFFFFF;
+  --superficie-2: #F3F6FA;
+  --tinta: #0B2D5B;
+  --tenue: #4F6280;
+  --linea: #D3DCE8;
+  --sello: #1565C0;
+  --sello-hover: #0B2D5B;
+  --sello-suave: #E1EEFC;
+  --sello-txt: #FFFFFF;
+  --acento: #1E88E5;
+  --verde: #00C853;
+  --senal: #8A5900;
+  --senal-suave: #FBEFD3;
+  --senal-borde: #E9B44C;
+  --ok: #00873A;
+  --ok-suave: #DCF5E6;
+  --mal: #A8332D;
+  --mal-suave: #F8E0DE;
+  --sombra: 0 1px 0 rgb(11 45 91 / 0.04), 0 12px 32px -18px rgb(11 45 91 / 0.3);
+  --velo: rgb(11 45 91 / 0.45);
+
+  --f-display: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+  --f-texto: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --t-xs: 0.75rem; --t-s: 0.8125rem; --t-m: 0.9375rem; --t-l: 1.125rem; --t-xl: 1.5rem; --t-2xl: 2.125rem;
+  --r-s: 6px; --r-m: 10px; --r-l: 16px;
+  --ancho: 1200px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papel: #06152B; --superficie: #0C1F3A; --superficie-2: #112847; --tinta: #E8EEF5; --tenue: #9DAEC6; --linea: #1F3B62;
+    --sello: #5AAAF2; --sello-hover: #86C1F6; --sello-suave: #123460; --sello-txt: #06152B; --acento: #1E88E5; --verde: #00C853;
+    --senal: #F2BC4E; --senal-suave: #3A2B0C; --senal-borde: #9C7322;
+    --ok: #2FD47A; --ok-suave: #0B3020; --mal: #EE7B74; --mal-suave: #3B1715;
+    --sombra: 0 1px 0 rgb(0 0 0 / 0.3), 0 16px 40px -20px rgb(0 0 0 / 0.7); --velo: rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --papel: #06152B; --superficie: #0C1F3A; --superficie-2: #112847; --tinta: #E8EEF5; --tenue: #9DAEC6; --linea: #1F3B62;
+  --sello: #5AAAF2; --sello-hover: #86C1F6; --sello-suave: #123460; --sello-txt: #06152B; --acento: #1E88E5; --verde: #00C853;
+  --senal: #F2BC4E; --senal-suave: #3A2B0C; --senal-borde: #9C7322;
+  --ok: #2FD47A; --ok-suave: #0B3020; --mal: #EE7B74; --mal-suave: #3B1715;
+  --sombra: 0 1px 0 rgb(0 0 0 / 0.3), 0 16px 40px -20px rgb(0 0 0 / 0.7); --velo: rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}

@@ -1,0 +1,223 @@
+rules_version = '2';
+
+// APPRO · reglas de Firestore
+//
+// users/{uid}                    perfil público: empresa, contacto, categoría, sector, ubicación, CUIT, logo
+// users/{uid}/privado/contacto   datos de contacto: email y teléfono
+// users/{uid}/aceptados/{prov}   el comprador {uid} aceptó la solicitud del proveedor {prov}
+// personas/{uid}                 ficha de la red (sin mail ni teléfono)
+// solicitudes/{id}               pedido de contacto de un proveedor a un comprador
+// pedidos/{id}                   pedido de cotización de un comprador
+// cotizaciones/{pedido}_{prov}   una cotización por proveedor y pedido
+//
+// Firestore no puede ocultar campos dentro de un documento, por eso el contacto vive aparte.
+// Quién ve el contacto de quién:
+//   - el comprador ve el contacto de los proveedores
+//   - el proveedor ve el contacto de un comprador SOLO si ese comprador aceptó su solicitud
+//   - un proveedor NO ve el contacto de otro proveedor (ni un comprador el de otro comprador)
+// El rol se elige al registrarse y después no se puede cambiar desde la app.
+// La misma política está en src/domain/acceso.ts (puedeVerContacto) para que la interfaz no muestre
+// lo que estas reglas igual bloquearían.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esDuenio(uid) { return autenticado() && request.auth.uid == uid; }
+    function perfil(uid) { return get(/databases/$(database)/documents/users/$(uid)); }
+    function tienePerfil() {
+      return autenticado() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function textoOpcional(d, campo, max) {
+      return !(campo in d) || (d[campo] is string && d[campo].size() <= max);
+    }
+
+    function perfilValido(d) {
+      return d.keys().hasOnly(['rol', 'empresa', 'contactoNombre', 'categoria', 'sector', 'ubicacion', 'cuit', 'logoUrl', 'creado', 'actualizado'])
+        && d.keys().hasAll(['rol', 'empresa', 'contactoNombre', 'categoria', 'ubicacion', 'cuit'])
+        && d.rol in ['comprador', 'proveedor']
+        && d.empresa is string && d.empresa.size() >= 2 && d.empresa.size() <= 120
+        && d.contactoNombre is string && d.contactoNombre.size() >= 2 && d.contactoNombre.size() <= 80
+        && d.categoria is string && d.categoria.size() >= 2 && d.categoria.size() <= 40
+        && d.ubicacion is string && d.ubicacion.size() >= 2 && d.ubicacion.size() <= 120
+        && d.cuit is string && d.cuit.matches('^[0-9]{2}-[0-9]{8}-[0-9]$')
+        && textoOpcional(d, 'sector', 80)
+        && (!('logoUrl' in d) || d.logoUrl == null || (d.logoUrl is string && d.logoUrl.size() <= 2048));
+    }
+
+    function contactoValido(d) {
+      return d.keys().hasOnly(['email', 'telefono'])
+        && d.email is string && d.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$') && d.email.size() <= 254
+        && d.telefono is string && d.telefono.size() <= 30;
+    }
+
+    function aceptoA(compradorUid, proveedorUid) {
+      return exists(/databases/$(database)/documents/users/$(compradorUid)/aceptados/$(proveedorUid));
+    }
+
+    function puedeVerContacto(uid) {
+      let lector = perfil(request.auth.uid).data.rol;
+      let duenio = perfil(uid).data.rol;
+      return (lector == 'proveedor' && duenio == 'comprador' && aceptoA(uid, request.auth.uid))
+          || (lector == 'comprador' && duenio == 'proveedor');
+    }
+
+    match /users/{uid} {
+      // Solo usuarios registrados (con perfil) recorren la red. Cada uno siempre lee el suyo.
+      allow read: if esDuenio(uid) || tienePerfil();
+      allow create: if esDuenio(uid) && perfilValido(request.resource.data);
+      // Rol, CUIT y fecha de alta quedan fijos.
+      allow update: if esDuenio(uid)
+        && perfilValido(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol', 'cuit', 'creado']);
+      // La baja la hace el equipo (Ley 25.326: supresión a pedido), no el cliente.
+      allow delete: if false;
+
+      match /privado/{doc} {
+        allow read: if doc == 'contacto' && (esDuenio(uid) || (tienePerfil() && puedeVerContacto(uid)));
+        allow create, update: if doc == 'contacto' && esDuenio(uid) && contactoValido(request.resource.data);
+        allow delete: if false;
+      }
+
+      // Solo el comprador acepta (o revoca) a un proveedor. El proveedor puede ver si fue aceptado.
+      match /aceptados/{prov} {
+        allow read: if esDuenio(uid) || (autenticado() && request.auth.uid == prov);
+        allow create: if esDuenio(uid)
+          && perfil(uid).data.rol == 'comprador'
+          && perfil(prov).data.rol == 'proveedor'
+          && request.resource.data.keys().hasOnly(['aceptado'])
+          && request.resource.data.aceptado == request.time;
+        allow update: if false;
+        allow delete: if esDuenio(uid);
+      }
+    }
+
+    // ── Red ──────────────────────────────────────────────────────────────
+    // Ficha pública de cada cuenta en la red. La escribe solo su dueño y nunca lleva datos de contacto.
+    // Las verificaciones, las reseñas y la tasa de respuesta las define el equipo, no el usuario.
+
+    function rolDe(uid) { return perfil(uid).data.rol; }
+    function esRol(rol) { return tienePerfil() && rolDe(request.auth.uid) == rol; }
+    function listaCorta(v, max) { return v is list && v.size() <= max; }
+
+    function personaValida(d, uid) {
+      return d.keys().hasOnly([
+          'rol', 'nombre', 'apellido', 'cargo', 'empresa', 'idFiscal', 'ciudad', 'region', 'rubros', 'verificaciones', 'logo',
+          'ventanaHasta', 'foco', 'acepta', 'noAcepta', 'tasaRespuesta', 'semiAnonimo', 'circulos',
+          'plan', 'desde', 'empleados', 'certificaciones', 'catalogo', 'cobertura', 'resenas', 'avisos',
+          'ts', 'actualizado'])
+        && d.rol == rolDe(uid)
+        && d.idFiscal == perfil(uid).data.cuit
+        && d.empresa is string && d.empresa.size() >= 2 && d.empresa.size() <= 120
+        && d.nombre is string && d.nombre.size() <= 80
+        && d.apellido is string && d.apellido.size() <= 80
+        && d.cargo is string && d.cargo.size() <= 80
+        && d.ciudad is string && d.ciudad.size() <= 120
+        && d.region in ['ros', 'amba', 'cba', 'noa', 'costa']
+        && listaCorta(d.rubros, 10) && d.rubros.size() >= 1
+        && (!('logo' in d) || d.logo == null || (d.logo is string && d.logo.size() <= 2048))
+        && (d.rol == 'comprador'
+              ? (!('plan' in d) && !('resenas' in d) && !('avisos' in d)
+                 && listaCorta(d.circulos, 20) && d.semiAnonimo is bool)
+              : (d.plan in ['gratis', 'pro', 'empresa'] && d.avisos in ['inmediato', 'diario', 'pausado']
+                 && listaCorta(d.certificaciones, 30) && listaCorta(d.catalogo, 50) && listaCorta(d.resenas, 200)
+                 && !('ventanaHasta' in d) && !('tasaRespuesta' in d)));
+    }
+
+    match /personas/{uid} {
+      allow read: if tienePerfil();
+      allow create: if esDuenio(uid) && tienePerfil()
+        && personaValida(request.resource.data, uid)
+        && request.resource.data.verificaciones.cargoRevisado == false
+        && (request.resource.data.rol == 'proveedor'
+              ? (request.resource.data.resenas.size() == 0 && request.resource.data.plan == 'gratis')
+              : request.resource.data.tasaRespuesta == 0);
+      // Beta: el plan lo cambia el usuario porque todavía no hay cobro. Al activar el cobro, sacar 'plan' de lo editable.
+      allow update: if esDuenio(uid)
+        && personaValida(request.resource.data, uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['rol', 'idFiscal', 'verificaciones', 'resenas', 'tasaRespuesta', 'ts']);
+      allow delete: if false;
+    }
+
+    // ── Solicitudes de contacto ──────────────────────────────────────────
+    // Las ven solo las dos partes. Las crea el proveedor; las responde solo el comprador.
+
+    match /solicitudes/{id} {
+      allow read: if autenticado()
+        && (resource.data.proveedorId == request.auth.uid || resource.data.compradorId == request.auth.uid);
+      allow create: if esRol('proveedor')
+        && request.resource.data.keys().hasOnly(['proveedorId', 'compradorId', 'motivo', 'estado', 'creada', 'ts'])
+        && request.resource.data.proveedorId == request.auth.uid
+        && request.resource.data.compradorId is string
+        && rolDe(request.resource.data.compradorId) == 'comprador'
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.motivo is string
+        && request.resource.data.motivo.size() >= 40 && request.resource.data.motivo.size() <= 300
+        && request.resource.data.creada is string && request.resource.data.creada.size() == 10
+        && request.resource.data.ts == request.time;
+      allow update: if autenticado()
+        && resource.data.compradorId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'respondida'])
+        && request.resource.data.estado in ['aceptada', 'postergada', 'rechazada'];
+      allow delete: if false;
+    }
+
+    // ── Pedidos de cotización ────────────────────────────────────────────
+    // Los ve cualquier usuario registrado. Los publica un comprador y solo él los adjudica, una vez,
+    // a un proveedor que efectivamente cotizó.
+
+    match /pedidos/{id} {
+      allow read: if tienePerfil();
+      allow create: if esRol('comprador')
+        && request.resource.data.keys().hasOnly(['compradorId', 'titulo', 'rubro', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'estado', 'ts'])
+        && request.resource.data.compradorId == request.auth.uid
+        && request.resource.data.estado == 'abierto'
+        && request.resource.data.titulo is string && request.resource.data.titulo.size() >= 3 && request.resource.data.titulo.size() <= 160
+        && request.resource.data.rubro is string && request.resource.data.rubro.size() <= 40
+        && request.resource.data.cantidad is number && request.resource.data.cantidad > 0
+        && request.resource.data.unidad is string && request.resource.data.unidad.size() <= 40
+        && request.resource.data.entrega is string && request.resource.data.entrega.size() <= 200
+        && request.resource.data.pago is string && request.resource.data.pago.size() <= 120
+        && request.resource.data.zona is string && request.resource.data.zona.size() <= 120
+        && request.resource.data.cierre is string && request.resource.data.cierre.size() <= 40
+        && request.resource.data.ts == request.time;
+      allow update: if autenticado()
+        && resource.data.compradorId == request.auth.uid
+        && resource.data.estado == 'abierto'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'adjudicadaA'])
+        && request.resource.data.estado == 'adjudicado'
+        && request.resource.data.adjudicadaA is string
+        && exists(/databases/$(database)/documents/cotizaciones/$(id + '_' + request.resource.data.adjudicadaA));
+      allow delete: if false;
+    }
+
+    // ── Cotizaciones ─────────────────────────────────────────────────────
+    // El comprador ve todas las de sus pedidos; cada proveedor, solo la suya.
+    // El id es {pedido}_{proveedor}: un proveedor cotiza una sola vez por pedido. No se editan ni se borran.
+
+    match /cotizaciones/{id} {
+      allow read: if autenticado()
+        && (resource.data.compradorId == request.auth.uid || resource.data.proveedorId == request.auth.uid);
+      allow create: if esRol('proveedor')
+        && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'compradorId', 'precioUnitario', 'plazoDias', 'pago', 'nota', 'creada', 'ts'])
+        && request.resource.data.proveedorId == request.auth.uid
+        && id == request.resource.data.pedidoId + '_' + request.auth.uid
+        && get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.estado == 'abierto'
+        && request.resource.data.compradorId == get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.compradorId
+        && request.resource.data.precioUnitario is number && request.resource.data.precioUnitario > 0
+        && request.resource.data.plazoDias is int && request.resource.data.plazoDias >= 0 && request.resource.data.plazoDias <= 3650
+        && request.resource.data.pago is string && request.resource.data.pago.size() <= 120
+        && request.resource.data.nota is string && request.resource.data.nota.size() <= 600
+        && request.resource.data.creada is string && request.resource.data.creada.size() == 10
+        && request.resource.data.ts == request.time;
+      allow update, delete: if false;
+    }
+
+    // Todo lo demás, cerrado hasta que tenga reglas propias.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
