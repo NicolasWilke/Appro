@@ -153,7 +153,7 @@ Para saber qué versión está publicada, mirá el pie de página: dice `Firebas
 
 El plan Spark no tiene Cloud Functions, así que nada corre en Firebase cuando se publica un pedido. El pedido queda guardado con `avisado: false` y `npm run avisos` hace el resto: busca los pedidos sin avisar, manda los mails, deja registro en `pedidos/{id}/avisos` (lo que ve el comprador) y lo marca avisado. `npm run avisos -- --resumen` manda los resúmenes diarios.
 
-Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Hace falta subir el proyecto a un repositorio de GitHub y cargar los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend). Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
+Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Viene apagado: primero cargá en GitHub los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend) y después borrá los `#` de las líneas `schedule` del archivo. Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
 
 ### Qué cambia con el plan Spark
 

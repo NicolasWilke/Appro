@@ -10,9 +10,11 @@
 name: Avisos por mail
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
-    - cron: '0 11 * * *'
+  # Apagado hasta cargar los secretos de abajo: sin ellos fallaría cada 30 minutos.
+  # Para encenderlo, borrá los # de las tres líneas siguientes.
+  # schedule:
+  #   - cron: '*/30 * * * *'
+  #   - cron: '0 11 * * *'
   workflow_dispatch:
     inputs:
       resumen:
