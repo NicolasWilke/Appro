@@ -6,4 +6,5 @@ dist-artifact
 .firebaserc
 *-debug.log
 .firebase
-_respaldo-antes-firebase
+clave-servicio*.json
+*-service-account*.json

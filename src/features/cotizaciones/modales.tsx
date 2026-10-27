@@ -88,19 +88,7 @@ export function NuevoPedidoModal({ compradorId, onCerrar, onCreado }: { comprado
   const publicar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valido) return;
-    let p;
-    try {
-      p = await repo.publicarPedido({ compradorId, titulo: f.titulo.trim(), rubro: r, cantidad: Number(f.cantidad), unidad: rubro(r).unidad, entrega: f.entrega.trim(), pago: f.pago, zona: f.zona.trim(), cierre: f.cierre });
-    } catch (err) {
-      avisar((err as Error).message, 'error');
-      return;
-    }
-    if (import.meta.env.VITE_DATA_SOURCE === 'firebase') {
-      // Sin backend de mails todavía: no se promete ningún aviso.
-      avisar(`Pedido ${p.id} publicado. Los proveedores de ${rubro(r).nombre.toLowerCase()} ya lo ven en su panel.`);
-      onCreado(p.id);
-      return;
-    }
+    const p = await repo.publicarPedido({ compradorId, titulo: f.titulo.trim(), rubro: r, cantidad: Number(f.cantidad), unidad: rubro(r).unidad, entrega: f.entrega.trim(), pago: f.pago, zona: f.zona.trim(), cierre: f.cierre });
     const avisos = await repo.avisosDePedido(p.id);
     const mails = avisos.filter((a) => a.via === 'mail').length;
     const resumen = avisos.length - mails;

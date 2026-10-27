@@ -1,3 +1,5 @@
+import { useAuth } from '@/auth/AuthProvider';
+import * as ejemplos from '@/data/mock/seed';
 import { Link } from 'react-router-dom';
 import { REGION } from '@/config/region';
 import { useQuery } from '@/data/DataProvider';
@@ -16,11 +18,15 @@ const PASOS = [
 ];
 
 export function Landing() {
-  const { data } = useQuery(async (r) => ({
+  const { auth, cuenta } = useAuth();
+  // Con datos reales, la red solo se muestra a usuarios registrados.
+  const puedeLeer = auth.modo === 'demo' || !!cuenta;
+  const { data } = useQuery(async (r) => (puedeLeer ? {
     compradores: await r.listarCompradores(),
     indice: await r.indicePrecios(),
-  }), []);
-  const laura = data?.compradores.find((c) => c.id === 'laura-gimenez');
+  } : null), [puedeLeer]);
+  // La ficha de la portada es siempre la de ejemplo (persona ficticia).
+  const laura = ejemplos.compradores.find((c) => c.id === 'laura-gimenez');
   const abiertos = data?.compradores.filter((c) => ventanaAbierta(c) && !c.semiAnonimo).slice(0, 3) ?? [];
   const serie = data?.indice.series[0];
 
@@ -101,7 +107,7 @@ export function Landing() {
         </section>
       )}
 
-      {serie && data && (
+      {serie && data && serie.variaciones.length > 0 && (
         <section className="envoltura bloque bloque--indice">
           <div className="indice-teaser">
             <div>

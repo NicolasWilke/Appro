@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSesion } from '@/app/session';
+import { useAuth } from '@/auth/AuthProvider';
 import { useQuery, useRepo } from '@/data/DataProvider';
 import { useToast } from '@/ui/Toast';
 import type { FrecuenciaAvisos } from '@/domain/types';
@@ -8,15 +9,17 @@ import { PLANES } from '@/domain/planes';
 import { estadoVisibleParaProveedor } from '@/domain/reglas';
 import type { Comprador, Proveedor } from '@/domain/types';
 import { fmt, t } from '@/i18n';
-import { Avatar, Copiable, Medidor, Pill, Seccion, Vacio, type TonoPill } from '@/ui/primitivas';
+import { Avatar, Medidor, Pill, Seccion, Vacio, type TonoPill } from '@/ui/primitivas';
 import { ventanaAbierta } from '../red/FichaComprador';
 import { PedirContacto } from '../red/PedirContacto';
 import { TarjetaComprador } from '../red/TarjetaProveedor';
+import { ContactoPersona } from '../red/ContactoPersona';
 
 const TONO: Record<string, TonoPill> = { pendiente: 'senal', aceptada: 'ok', postergada: 'neutro', cerrada: 'neutro' };
 
 export function PanelProveedor() {
   const { usuarioId } = useSesion();
+  const { cuenta } = useAuth();
   const [contactar, setContactar] = useState<Comprador | null>(null);
   const repo = useRepo();
   const avisar = useToast();
@@ -101,7 +104,7 @@ export function PanelProveedor() {
         </div>
         <div className="panel__col">
           <Seccion titulo="Avisos de pedidos nuevos">
-            <p className="tenue">Te llegan a {yo.contacto.email} los pedidos de tus rubros.</p>
+            <p className="tenue">Te llegan a {cuenta?.contacto.email} los pedidos de tus rubros.</p>
             <div className="segmento segmento--ancho segmento--apilable" role="group" aria-label="Frecuencia de avisos">
               {([['inmediato', 'Un mail por pedido'], ['diario', 'Resumen diario'], ['pausado', 'Pausar']] as [FrecuenciaAvisos, string][]).map(([f, txt]) => (
                 <button key={f} type="button" aria-pressed={yo.avisos === f} className={yo.avisos === f ? 'is-activo' : ''}
@@ -128,8 +131,7 @@ export function PanelProveedor() {
                   </div>
                   {s.estado === 'aceptada' && (
                     <div className="contacto contacto--plano">
-                      <Copiable etiqueta="Mail" texto={c.contacto.email} />
-                      <Copiable etiqueta="Teléfono" texto={c.contacto.telefono} />
+                      <ContactoPersona p={c} aceptado />
                     </div>
                   )}
                   {est === 'cerrada' && <p className="tenue">Se cerró sin respuesta. Podés volver a intentar con otra propuesta.</p>}

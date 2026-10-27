@@ -7,9 +7,6 @@ import { t } from '@/i18n';
 import { useToast } from '@/ui/Toast';
 import { useAuth } from '@/auth/AuthProvider';
 
-/** La red, los pedidos y las cotizaciones vienen de Firestore (no hay datos de ejemplo que reiniciar). */
-const DATOS_REALES = import.meta.env.VITE_DATA_SOURCE === 'firebase';
-
 const NAV = [
   { a: '/', texto: t.nav.inicio, fin: true },
   { a: '/red', texto: t.nav.red },
@@ -60,19 +57,17 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <div className="aviso-demo">
-        <div className="envoltura">
-          <span>{DATOS_REALES
-            ? 'Versión beta: las cuentas, la red, los pedidos y las cotizaciones son reales. Los avisos por mail todavía no se envían.'
-            : auth.modo === 'demo' ? t.demo.aviso : 'Las cuentas y perfiles son reales. La red, los pedidos y las cotizaciones todavía son de ejemplo.'}</span>
-          {!DATOS_REALES && (
-          <span className="aviso-demo__acc">
-          <NavLink to="/mails" className="enlace">Mails enviados</NavLink>
-          <button type="button" className="enlace" onClick={async () => { await repo.reiniciarDemo(); if (cuenta) await repo.sincronizarCuenta({ ...cuenta.perfil, ...cuenta.contacto }); avisar('Demo reiniciada con los datos de ejemplo.', 'info'); }}>{t.demo.reiniciar}</button>
-          </span>
-          )}
+      {auth.modo === 'demo' && (
+        <div className="aviso-demo">
+          <div className="envoltura">
+            <span>{t.demo.aviso}</span>
+            <span className="aviso-demo__acc">
+            <NavLink to="/mails" className="enlace">Mails enviados</NavLink>
+            <button type="button" className="enlace" onClick={async () => { await repo.reiniciarDemo(); if (cuenta) await repo.sincronizarCuenta({ ...cuenta.perfil, ...cuenta.contacto }); avisar('Demo reiniciada con los datos de ejemplo.', 'info'); }}>{t.demo.reiniciar}</button>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
       <main className="principal"><Outlet /></main>
       <footer className="pie">
         <div className="envoltura pie__in">
@@ -80,7 +75,7 @@ export function Layout() {
             <p><strong>{t.marca}</strong> · {t.bajada} · {REGION.pais}</p>
             <p className="tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
           </div>
-          <p className="tenue mono">Prototipo v0.1 · octubre 2026</p>
+          <p className="tenue mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</p>
         </div>
       </footer>
     </div>

@@ -1,10 +1,10 @@
 import {
-  createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail,
-  signInWithEmailAndPassword, signOut, updateProfile, type User,
+  createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, type User,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { CONFIG, firebase } from '@/firebase/app';
+import { firebase, USA_STORAGE } from '@/firebase/app';
+import { blobADataUrl } from '../imagen';
 import { FalloAuth, type AltaCuenta, type AuthService, type CambiosPerfil, type CodigoFallo, type ContactoCuenta, type Cuenta, type PerfilCuenta } from '../tipos';
 
 /**
@@ -36,14 +36,12 @@ function traducir(e: unknown): FalloAuth {
 }
 
 export function crearFirebaseAuth(): AuthService {
-  if (!CONFIG.apiKey || !CONFIG.projectId) {
-    throw new Error('Faltan las claves de Firebase. Copiá .env.example a .env.local y completá VITE_FIREBASE_*.');
-  }
   return new FirebaseAuth();
 }
 
 class FirebaseAuth implements AuthService {
   readonly modo = 'firebase' as const;
+  readonly logoEnPerfil = !USA_STORAGE;
   private auth = firebase().auth;
   private db = firebase().db;
   private storage = firebase().storage;
@@ -168,12 +166,23 @@ class FirebaseAuth implements AuthService {
   async subirLogo(imagen: Blob) {
     const u = this.yo();
     const anterior = this.ultima?.perfil.logoUrl;
+    if (!this.storage) {
+      // Plan Spark: sin Storage, la imagen (ya achicada) va dentro del perfil.
+      try {
+        const url = await blobADataUrl(imagen);
+        await updateDoc(doc(this.db, 'users', u.uid), { logoUrl: url, actualizado: serverTimestamp() });
+        await this.refrescar();
+        return url;
+      } catch (e) {
+        throw traducir(e);
+      }
+    }
     try {
       const destino = ref(this.storage, `logos/${u.uid}/logo-${Date.now()}`);
       await uploadBytes(destino, imagen, { contentType: imagen.type || 'image/png', cacheControl: 'public, max-age=31536000' });
       const url = await getDownloadURL(destino);
       await updateDoc(doc(this.db, 'users', u.uid), { logoUrl: url, actualizado: serverTimestamp() });
-      if (anterior) await deleteObject(ref(this.storage, anterior)).catch(() => undefined);
+      if (anterior?.startsWith('http')) await deleteObject(ref(this.storage, anterior)).catch(() => undefined);
       await this.refrescar();
       return url;
     } catch (e) {
@@ -186,7 +195,7 @@ class FirebaseAuth implements AuthService {
     const anterior = this.ultima?.perfil.logoUrl;
     try {
       await updateDoc(doc(this.db, 'users', u.uid), { logoUrl: null, actualizado: serverTimestamp() });
-      if (anterior) await deleteObject(ref(this.storage, anterior)).catch(() => undefined);
+      if (this.storage && anterior?.startsWith('http')) await deleteObject(ref(this.storage, anterior)).catch(() => undefined);
     } catch (e) {
       throw traducir(e);
     }

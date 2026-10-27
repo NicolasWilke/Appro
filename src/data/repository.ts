@@ -16,7 +16,7 @@ export interface Repository {
   listarProveedores(filtro?: FiltroRed): Promise<Proveedor[]>;
   obtenerPersona(id: string): Promise<Persona | null>;
   /** Crea o actualiza la persona de la red que corresponde a una cuenta registrada (mismo id). */
-  sincronizarCuenta(cuenta: DatosCuenta): Promise<Persona>;
+  sincronizarCuenta(cuenta: DatosCuenta): Promise<unknown>;
 
   solicitudesRecibidas(compradorId: string): Promise<SolicitudContacto[]>;
   solicitudesEnviadas(proveedorId: string): Promise<SolicitudContacto[]>;
@@ -43,7 +43,8 @@ export interface Repository {
   indicePrecios(): Promise<{ series: SerieIndice[]; inflacion: number[]; meses: string[] }>;
 
   uso(proveedorId: string): Promise<Uso>;
-  cambiarPlan(proveedorId: string, plan: PlanId): Promise<void>;
+  /** 'activo': se aplicó ya (demo). 'solicitado': lo activa el equipo al confirmar el cobro. */
+  cambiarPlan(proveedorId: string, plan: PlanId): Promise<'activo' | 'solicitado'>;
   embudo(proveedorId: string): Promise<Embudo>;
 
   reiniciarDemo(): Promise<void>;

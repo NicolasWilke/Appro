@@ -26,8 +26,10 @@ export function Planes() {
   const elegir = async (id: PlanId) => {
     if (!cuenta) { ir('/ingresar?modo=registro&rol=proveedor'); return; }
     if (!esProveedor) { avisar('Los planes pagos son para proveedores. Como comprador usás la red gratis.', 'info'); return; }
-    await repo.cambiarPlan(cuenta.uid, id);
-    avisar(`Plan ${PLANES[id].nombre} activo en ${cuenta.perfil.empresa}.`);
+    const resultado = await repo.cambiarPlan(cuenta.uid, id);
+    avisar(resultado === 'activo'
+      ? `Plan ${PLANES[id].nombre} activo en ${cuenta.perfil.empresa}.`
+      : `Recibimos tu pedido del plan ${PLANES[id].nombre}. Te escribimos para coordinar el pago y lo activamos.`, resultado === 'activo' ? 'ok' : 'info');
   };
 
   return (

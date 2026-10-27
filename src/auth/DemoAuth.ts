@@ -41,6 +41,7 @@ const clave = (email: string) => email.trim().toLowerCase();
 
 export class DemoAuth implements AuthService {
   readonly modo = 'demo' as const;
+  readonly logoEnPerfil = true;
   private estado: Estado = { cuentas: {}, sesion: null };
   private oyentes = new Set<(c: Cuenta | null) => void>();
   private listo: Promise<void>;
