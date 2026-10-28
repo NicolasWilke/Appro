@@ -48,6 +48,8 @@ export interface Resena {
   calidad: number;
   facturacion: number;
   fecha: string;
+  /** Pedido adjudicado que respalda la reseña (una por pedido) */
+  pedidoId?: string;
 }
 
 export interface Proveedor extends PersonaBase {

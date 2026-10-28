@@ -1,3 +1,4 @@
+import { EditarValores } from '@/features/admin/EditarValores';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Landing } from '@/features/landing/Landing';
 import { Acceso } from '@/features/acceso/Acceso';
@@ -37,6 +38,7 @@ const rutas = (
       <Route path="precios" element={<IndicePrecios />} />
       <Route path="mails" element={<Bandeja />} />
       <Route path="valores" element={<ValoresReferencia />} />
+      <Route path="admin/valores" element={<EditarValores />} />
     </Route>
     <Route path="*" element={<Landing />} />
   </Route>

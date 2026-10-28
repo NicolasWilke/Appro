@@ -1,7 +1,8 @@
 import type {
   Comprador, DatosCuenta, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
-  Persona, PlanId, Proveedor, SerieIndice, SolicitudContacto, Uso,
+  Persona, PlanId, Proveedor, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
+import type { DatosResena } from '@/domain/resenas';
 
 export type NuevoPedido = Omit<PedidoCotizacion, 'id' | 'estado' | 'adjudicadaA'>;
 export type NuevaCotizacion = Omit<Cotizacion, 'id' | 'creada'>;
@@ -39,6 +40,14 @@ export interface Repository {
   enviarResumenesAhora(): Promise<number>;
 
   valoresReferencia(): Promise<{ valores: ValorReferencia[]; mesesIso: string[]; inflacion: number[] }>;
+  /** Solo administradores: cambia un valor de referencia. */
+  guardarValor(valor: ValorReferencia): Promise<void>;
+  /** Si la cuenta puede editar los valores de referencia. */
+  esAdmin(uid: string): Promise<boolean>;
+
+  /** La reseña del comprador para un pedido adjudicado, si ya la dejó. */
+  resenaDePedido(pedidoId: string): Promise<Resena | null>;
+  resenar(pedidoId: string, datos: DatosResena): Promise<void>;
 
   indicePrecios(): Promise<{ series: SerieIndice[]; inflacion: number[]; meses: string[] }>;
 

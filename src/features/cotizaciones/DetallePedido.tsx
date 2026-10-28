@@ -11,6 +11,7 @@ import { useToast } from '@/ui/Toast';
 import { promedio } from '../red/TarjetaProveedor';
 import { LecturaIndice } from './LecturaIndice';
 import { CotizarModal } from './modales';
+import { Resenar } from './Resenar';
 
 export function DetallePedido() {
   const { id = '' } = useParams();
@@ -22,14 +23,14 @@ export function DetallePedido() {
     const pedido = await r.obtenerPedido(id);
     if (!pedido) return null;
     const [cotis, provs, indice, comprador] = await Promise.all([r.cotizacionesDe(id), r.listarProveedores(), r.indicePrecios(), r.obtenerPersona(pedido.compradorId)]);
-    const avisos = await r.avisosDePedido(id);
-    return { pedido, cotis, provs, ref: indice.series.find((s) => s.rubro === pedido.rubro), comprador, avisos };
+    const [avisos, resena] = await Promise.all([r.avisosDePedido(id), pedido.estado === 'adjudicado' ? r.resenaDePedido(id) : null]);
+    return { pedido, cotis, provs, ref: indice.series.find((s) => s.rubro === pedido.rubro), comprador, avisos, resena };
   }, [id]);
 
   if (cargando) return <div className="envoltura pagina" />;
   if (!data) return <div className="envoltura pagina"><Vacio titulo="Este pedido no existe" accion={{ a: '/cotizaciones', texto: 'Ver pedidos' }} /></div>;
 
-  const { pedido, cotis, provs, ref, comprador, avisos } = data;
+  const { pedido, cotis, provs, ref, comprador, avisos, resena } = data;
   const esDueno = rol === 'comprador' && pedido.compradorId === usuarioId;
   const visibles = esDueno ? cotis : cotis.filter((c) => c.proveedorId === usuarioId);
   const prov = (pid: string) => provs.find((p) => p.id === pid) as Proveedor;
@@ -93,7 +94,7 @@ export function DetallePedido() {
                       {esDueno && (
                         <td>
                           {pedido.estado === 'abierto'
-                            ? <button className="btn btn--sec btn--chico" onClick={async () => { await repo.adjudicar(pedido.id, c.id); avisar(`Adjudicado a ${p.empresa}. Cuando termine la entrega vas a poder dejar una reseña.`); }}>Adjudicar</button>
+                            ? <button className="btn btn--sec btn--chico" onClick={async () => { await repo.adjudicar(pedido.id, c.id); avisar(`Adjudicado a ${p.empresa.replace(/\.$/, '')}. Cuando termine la entrega, calificalo desde este pedido.`); }}>Adjudicar</button>
                             : ganadora && <Pill tono="ok">Elegida</Pill>}
                         </td>
                       )}
@@ -105,6 +106,9 @@ export function DetallePedido() {
           </div>
         )}
       </Seccion>
+      {esDueno && pedido.estado === 'adjudicado' && pedido.adjudicadaA && (
+        <Resenar pedidoId={pedido.id} empresa={prov(pedido.adjudicadaA)?.empresa ?? 'el proveedor'} resena={resena} />
+      )}
       {esDueno && (
         <Seccion titulo={`Aviso a proveedores · ${avisos.length}`} extra={<Link to="/mails" className="enlace">Ver los mails</Link>}>
           {avisos.length === 0 && <p className="tenue">Los avisos de este pedido salieron antes de que existiera el registro. En los pedidos nuevos vas a ver acá a quién le llegó.</p>}

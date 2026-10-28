@@ -119,9 +119,9 @@ describe('planes y referencias', () => {
     await assertSucceeds(setDoc(doc(como('prov1'), 'solicitudesPlan', 'prov1'), { plan: 'pro', pedido: serverTimestamp() }));
     await assertFails(setDoc(doc(como('comp1'), 'solicitudesPlan', 'comp1'), { plan: 'pro', pedido: serverTimestamp() }));
   });
-  it('los valores de referencia se leen pero no se escriben desde la app', async () => {
+  it('los valores de referencia los lee cualquier registrado y no los escribe un usuario común', async () => {
     await assertSucceeds(getDoc(doc(como('comp1'), 'valoresReferencia', 'v1')));
-    await assertFails(setDoc(doc(como('comp1'), 'valoresReferencia', 'v1'), { min: 1 }));
+    await assertFails(setDoc(doc(como('comp1'), 'valoresReferencia', 'v1'), valor('comp1')));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'valoresReferencia', 'v1')));
   });
   it('el logo puede ir como imagen chica dentro del perfil', async () => {
@@ -129,5 +129,60 @@ describe('planes y referencias', () => {
     await assertSucceeds(updateDoc(doc(db, 'users', 'prov1'), { logoUrl: 'data:image/webp;base64,UklGRiIAAABXRUJQ' }));
     await assertFails(updateDoc(doc(db, 'users', 'prov1'), { logoUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }));
     await assertFails(updateDoc(doc(db, 'users', 'prov1'), { logoUrl: 'data:image/png;base64,' + 'A'.repeat(200001) }));
+  });
+});
+
+const valor = (uid: string, cambios: Record<string, unknown> = {}) => ({
+  rubro: 'seguridad', concepto: 'Vigilador general', tipo: 'hora', unidad: 'hora', region: 'ros', principal: true,
+  min: 4800, mediana: 5200, max: 5900, fecha: '2026-10', actualizado: serverTimestamp(), actualizadoPor: uid, ...cambios,
+});
+
+describe('administración de valores', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'admins', 'comp2'), { nota: 'equipo' }); });
+  });
+  it('un administrador edita un valor con rango ordenado', async () => {
+    await assertSucceeds(setDoc(doc(como('comp2'), 'valoresReferencia', 'v1'), valor('comp2')));
+    await assertSucceeds(setDoc(doc(como('comp2'), 'valoresReferencia', 'v1'), valor('comp2', { min: 0, mediana: 0, max: 0 })));
+  });
+  it('rechaza rangos desordenados, negativos, firmas ajenas o campos de más', async () => {
+    const ref = doc(como('comp2'), 'valoresReferencia', 'v1');
+    await assertFails(setDoc(ref, valor('comp2', { min: 6000 })));
+    await assertFails(setDoc(ref, valor('comp2', { min: -1 })));
+    await assertFails(setDoc(ref, valor('comp1')));
+    await assertFails(setDoc(ref, valor('comp2', { oculto: true })));
+    await assertFails(setDoc(ref, valor('comp2', { fecha: 'octubre' })));
+  });
+  it('nadie se nombra administrador desde la app y solo uno lee su propia marca', async () => {
+    await assertFails(setDoc(doc(como('prov1'), 'admins', 'prov1'), { nota: 'yo' }));
+    await assertSucceeds(getDoc(doc(como('comp2'), 'admins', 'comp2')));
+    await assertFails(getDoc(doc(como('prov1'), 'admins', 'comp2')));
+  });
+});
+
+describe('reseñas', () => {
+  const resena = (cambios: Record<string, unknown> = {}) => ({
+    pedidoId: 'PC-1', proveedorId: 'prov1', compradorId: 'comp1', entrega: 5, calidad: 4, facturacion: 5,
+    texto: 'Cumplieron todos los turnos y facturaron en término.', autor: 'Nombre Apellido', empresa: 'Empresa comprador', creada: serverTimestamp(), ...cambios,
+  });
+  const adjudicar = () => env.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), 'pedidos', 'PC-1'), { estado: 'adjudicado', adjudicadaA: 'prov1' });
+  });
+
+  it('el comprador califica al proveedor que ganó su pedido, una sola vez', async () => {
+    await adjudicar();
+    const ref = doc(como('comp1'), 'resenas', 'PC-1');
+    await assertSucceeds(setDoc(ref, resena()));
+    await assertFails(setDoc(ref, resena({ entrega: 1 })));
+    await assertSucceeds(getDoc(doc(como('prov2'), 'resenas', 'PC-1')));
+  });
+  it('no se reseña un pedido abierto, ajeno, a otro proveedor ni con puntajes fuera de 1 a 5', async () => {
+    await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1'), resena()));
+    await adjudicar();
+    await assertFails(setDoc(doc(como('comp2'), 'resenas', 'PC-1'), resena({ compradorId: 'comp2' })));
+    await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1'), resena({ proveedorId: 'prov2' })));
+    await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1'), resena({ calidad: 6 })));
+    await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1'), resena({ texto: 'Bien' })));
+    await assertFails(setDoc(doc(como('prov1'), 'resenas', 'PC-1'), resena({ compradorId: 'prov1' })));
   });
 });

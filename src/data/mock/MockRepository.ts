@@ -2,7 +2,8 @@ import { REGION } from '@/config/region';
 import { ReglaDeNegocioError, validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Comprador, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso } from '@/domain/types';
+import type { Comprador, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
 import * as seed from './seed';
@@ -17,6 +18,8 @@ interface Estado {
   mails: MailSaliente[];
   /** pedidos esperando el resumen diario, por proveedor */
   colaResumen: Record<string, string[]>;
+  /** Valores de referencia editados desde el panel de administración, por id */
+  valores?: Record<string, ValorReferencia>;
 }
 
 const CLAVE = 'appro:demo:v2';
@@ -238,7 +241,38 @@ export class MockRepository implements Repository {
     return n;
   }
 
-  async valoresReferencia() { return { valores: seed.valores, mesesIso: seed.mesesIso, inflacion: seed.inflacion }; }
+  async valoresReferencia() {
+    const editados = this.estado.valores ?? {};
+    return { valores: seed.valores.map((v) => editados[v.id] ?? v), mesesIso: seed.mesesIso, inflacion: seed.inflacion };
+  }
+  async guardarValor(v: ValorReferencia) {
+    validarValor(v);
+    (this.estado.valores ??= {})[v.id] = clonar(v);
+    this.guardar();
+  }
+  /** En la demo cualquiera puede probar el panel de administración. */
+  async esAdmin() { return true; }
+
+  async resenaDePedido(pedidoId: string) {
+    for (const p of this.estado.proveedores) {
+      const r = p.resenas.find((x) => x.pedidoId === pedidoId);
+      if (r) return r;
+    }
+    return null;
+  }
+  async resenar(pedidoId: string, datos: DatosResena) {
+    validarResena(datos);
+    const pedido = this.estado.pedidos.find((x) => x.id === pedidoId);
+    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicadaA) throw new Error('Solo se reseña un pedido adjudicado.');
+    if (await this.resenaDePedido(pedidoId)) throw new Error('Ya dejaste la reseña de este pedido.');
+    const prov = this.estado.proveedores.find((x) => x.id === pedido.adjudicadaA)!;
+    const comp = this.estado.compradores.find((x) => x.id === pedido.compradorId);
+    prov.resenas.unshift({
+      ...datos, texto: datos.texto.trim(), pedidoId, fecha: hoy(),
+      autor: comp ? `${comp.nombre} ${comp.apellido}` : 'Comprador', empresa: comp?.empresa ?? '',
+    });
+    this.guardar();
+  }
 
   async indicePrecios() { return { series: seed.series, inflacion: seed.inflacion, meses: seed.meses }; }
 

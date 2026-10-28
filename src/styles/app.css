@@ -449,3 +449,17 @@ textarea { resize: vertical; line-height: 1.5; }
 .datos dt { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--tenue); font-weight: 600; }
 .datos dd { margin: 0.15rem 0 0; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .datos { grid-template-columns: minmax(0, 1fr); } }
+
+/* Reseñas: puntaje con estrellas */
+.puntajes { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin: 0.75rem 0; }
+.puntaje { display: flex; align-items: center; gap: 0.15rem; }
+.puntaje > span { min-width: 6.5rem; font-size: var(--t-s); }
+.puntaje__estrella { background: none; border: 0; padding: 0.15rem; font-size: 1.35rem; line-height: 1; color: var(--linea); cursor: pointer; }
+.puntaje__estrella.is-on { color: var(--senal); }
+.puntaje__estrella:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* Panel de administración de valores */
+.tabla--admin td { vertical-align: top; }
+.campo--chico { min-width: 5.5rem; margin: 0; }
+.campo--chico > span { font-size: var(--t-xs, 0.75rem); }
+.campo--chico input { width: 100%; }

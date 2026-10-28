@@ -4,7 +4,7 @@ import type { PlanId, SolicitudContacto, Uso } from './types';
 export const MOTIVO_MIN = 40;
 export const MOTIVO_MAX = 300;
 
-export type CodigoRegla = 'MOTIVO_CORTO' | 'MOTIVO_LARGO' | 'CUPO_SOLICITUDES' | 'CUPO_RESPUESTAS' | 'SOLICITUD_DUPLICADA' | 'NO_RECIBE' | 'PEDIDO_CERRADO' | 'YA_COTIZO';
+export type CodigoRegla = 'MOTIVO_CORTO' | 'MOTIVO_LARGO' | 'CUPO_SOLICITUDES' | 'CUPO_RESPUESTAS' | 'SOLICITUD_DUPLICADA' | 'NO_RECIBE' | 'PEDIDO_CERRADO' | 'YA_COTIZO' | 'RESENA_INVALIDA' | 'VALOR_INVALIDO';
 
 export class ReglaDeNegocioError extends Error {
   constructor(public codigo: CodigoRegla, mensaje: string) {

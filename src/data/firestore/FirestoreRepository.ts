@@ -5,9 +5,10 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { ReglaDeNegocioError, validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Comprador, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, SerieIndice, Uso, ValorReferencia,
+  Comprador, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
-import { aCotizacion, aPedido, aPersona, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
+import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
 import { valores as valoresBase } from '../valores-referencia';
 import type { NuevaCotizacion, NuevoPedido, Repository } from '../repository';
 
@@ -44,9 +45,27 @@ export class FirestoreRepository implements Repository {
     return new Map(snap.docs.map((d) => [d.id, d.data() as Estado]));
   }
 
+  /** Reseñas agrupadas por proveedor, de la más nueva a la más vieja. */
+  private async resenas(proveedorId?: string): Promise<Map<string, Resena[]>> {
+    const ref = collection(this.db, 'resenas');
+    const snap = await getDocs(proveedorId ? query(ref, where('proveedorId', '==', proveedorId)) : ref);
+    const mapa = new Map<string, Resena[]>();
+    for (const d of snap.docs) {
+      const lista = mapa.get(d.data().proveedorId) ?? [];
+      lista.push(aResena(d.id, d.data()));
+      mapa.set(d.data().proveedorId, lista);
+    }
+    for (const lista of mapa.values()) lista.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    return mapa;
+  }
+
   private async personas(rol: 'comprador' | 'proveedor'): Promise<Persona[]> {
     const [snap, estados] = await Promise.all([getDocs(query(collection(this.db, 'users'), where('rol', '==', rol))), this.estados()]);
     const personas = snap.docs.map((d) => aPersona(d.id, d.data(), estados.get(d.id)));
+    if (rol === 'proveedor') {
+      const porProveedor = await this.resenas();
+      for (const p of personas as Proveedor[]) p.resenas = porProveedor.get(p.id) ?? [];
+    }
     if (rol === 'comprador') {
       // La "ventana de compra" de un comprador es el cierre de su pedido abierto más lejano.
       const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('estado', '==', 'abierto')));
@@ -70,6 +89,8 @@ export class FirestoreRepository implements Repository {
     if (p.rol === 'comprador') {
       const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('compradorId', '==', id), where('estado', '==', 'abierto')));
       p.ventanaHasta = abiertos.docs.map((x) => x.data().cierre as string).sort().pop() ?? null;
+    } else {
+      p.resenas = (await this.resenas(id)).get(id) ?? [];
     }
     return p;
   }
@@ -171,10 +192,43 @@ export class FirestoreRepository implements Repository {
   // ── Referencias
   async valoresReferencia() {
     const [snap, indice] = await Promise.all([getDocs(collection(this.db, 'valoresReferencia')), getDoc(doc(this.db, 'config', 'indice'))]);
-    const valores = snap.empty ? valoresBase : snap.docs.map((d) => ({ ...(d.data() as ValorReferencia), id: d.id }));
+    // Lo cargado en Firestore pisa al valor del código con el mismo id; lo nuevo se suma.
+    const guardados = new Map(snap.docs.map((d) => [d.id, { ...(d.data() as ValorReferencia), id: d.id }]));
+    const valores = [...valoresBase.map((v) => guardados.get(v.id) ?? v), ...[...guardados.values()].filter((v) => !valoresBase.some((b) => b.id === v.id))];
     const i = indice.data() ?? {};
     return { valores, mesesIso: (i.mesesIso ?? []) as string[], inflacion: (i.inflacion ?? []) as number[] };
   }
+  async guardarValor(v: ValorReferencia) {
+    validarValor(v);
+    const { id, ...datos } = v;
+    // Firestore no acepta undefined: se omiten los campos opcionales vacíos.
+    const limpio = Object.fromEntries(Object.entries(datos).filter(([, x]) => x !== undefined));
+    await setDoc(doc(this.db, 'valoresReferencia', id), { ...limpio, actualizado: serverTimestamp(), actualizadoPor: this.yo() });
+    this.tocar(undefined);
+  }
+  async esAdmin(uid: string) {
+    try { return (await getDoc(doc(this.db, 'admins', uid))).exists(); } catch { return false; }
+  }
+
+  // ── Reseñas
+  async resenaDePedido(pedidoId: string) {
+    const d = await getDoc(doc(this.db, 'resenas', pedidoId));
+    return d.exists() ? aResena(d.id, d.data()) : null;
+  }
+  async resenar(pedidoId: string, datos: DatosResena) {
+    validarResena(datos);
+    const pedido = await this.obtenerPedido(pedidoId);
+    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicadaA) throw new Error('Solo se reseña un pedido adjudicado.');
+    const yo = (await this.obtenerPersona(this.yo())) as Comprador | null;
+    await setDoc(doc(this.db, 'resenas', pedidoId), {
+      pedidoId, proveedorId: pedido.adjudicadaA, compradorId: this.yo(),
+      entrega: datos.entrega, calidad: datos.calidad, facturacion: datos.facturacion, texto: datos.texto.trim(),
+      autor: yo ? `${yo.nombre} ${yo.apellido}`.trim() : 'Comprador', empresa: yo?.empresa ?? '',
+      creada: serverTimestamp(),
+    });
+    this.tocar(undefined);
+  }
+
   async indicePrecios() {
     const [snap, indice] = await Promise.all([getDocs(collection(this.db, 'indicePrecios')), getDoc(doc(this.db, 'config', 'indice'))]);
     const i = indice.data() ?? {};
