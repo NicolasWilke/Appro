@@ -11,7 +11,10 @@ rules_version = '2';
 // pedidos/{id}/cotizaciones/{prov}     la cotización de cada proveedor (una por proveedor)
 // pedidos/{id}/avisos/{prov}           a quién se avisó por mail (lo escribe el script de avisos)
 // solicitudesPlan/{uid}                el proveedor pide pasar a un plan pago
-// valoresReferencia/{id}, indicePrecios/{id}, config/{doc}   datos de referencia: solo lectura
+// valoresReferencia/{id}               valores de referencia: los edita un administrador desde /admin/valores
+// indicePrecios/{id}, config/{doc}     datos de referencia: solo lectura
+// admins/{uid}                         cuentas del equipo que editan valores (se crean desde la consola)
+// resenas/{pedidoId}                   calificación del comprador al proveedor que ganó su pedido
 //
 // Contacto (mail y teléfono):
 //   - el comprador ve el contacto de los proveedores
@@ -211,10 +214,61 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── Referencias: las carga el equipo (scripts/sembrar.ts o la consola).
-    match /valoresReferencia/{id} { allow read: if tienePerfil(); allow write: if false; }
+    // ── Administradores: se agregan a mano desde la consola (documento admins/{uid}).
+    function esAdmin() { return autenticado() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    match /admins/{uid} {
+      allow read: if esDuenio(uid);
+      allow write: if false;
+    }
+
+    // ── Referencias. Los valores los edita un administrador; el resto lo carga el equipo (scripts/sembrar.ts).
+    function numeroOpcional(d, campo) { return !(campo in d) || (d[campo] is number && d[campo] >= 0); }
+    function valorValido(d) {
+      return d.keys().hasOnly(['rubro', 'concepto', 'tipo', 'unidad', 'principal', 'region', 'min', 'mediana', 'max',
+                               'muestras', 'fuente', 'fuenteDetalle', 'fecha', 'actualizado', 'actualizadoPor'])
+        && rubroValido(d.rubro)
+        && texto(d.concepto, 2, 160)
+        && d.tipo in ['hora', 'unidad', 'proyecto']
+        && texto(d.unidad, 1, 40)
+        && d.region in ['ros', 'amba', 'cba', 'noa', 'costa', 'nacional']
+        && d.min is number && d.mediana is number && d.max is number
+        && d.min >= 0 && d.min <= d.mediana && d.mediana <= d.max
+        && numeroOpcional(d, 'muestras')
+        && (!('principal' in d) || d.principal is bool)
+        && (!('fuente' in d) || d.fuente in ['cotizaciones', 'arancel', 'convenio', 'estimado'])
+        && textoOpcional(d, 'fuenteDetalle', 200)
+        && (!('fecha' in d) || (d.fecha is string && d.fecha.matches('^[0-9]{4}-[0-9]{2}$')))
+        && d.actualizado == request.time
+        && d.actualizadoPor == request.auth.uid;
+    }
+    match /valoresReferencia/{id} {
+      allow read: if tienePerfil();
+      allow create, update: if esAdmin() && valorValido(request.resource.data);
+      allow delete: if false;
+    }
     match /indicePrecios/{id} { allow read: if tienePerfil(); allow write: if false; }
     match /config/{doc} { allow read: if tienePerfil(); allow write: if false; }
+
+    // ── Reseñas: una por pedido, del comprador que lo publicó al proveedor que lo ganó. No se editan.
+    function puntaje(v) { return v is int && v >= 1 && v <= 5; }
+    match /resenas/{pedidoId} {
+      allow read: if tienePerfil();
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'compradorId', 'entrega', 'calidad', 'facturacion', 'texto', 'autor', 'empresa', 'creada'])
+        && request.resource.data.pedidoId == pedidoId
+        && request.resource.data.compradorId == request.auth.uid
+        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.compradorId == request.auth.uid
+        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.estado == 'adjudicado'
+        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.adjudicadaA == request.resource.data.proveedorId
+        && puntaje(request.resource.data.entrega)
+        && puntaje(request.resource.data.calidad)
+        && puntaje(request.resource.data.facturacion)
+        && texto(request.resource.data.texto, 20, 500)
+        && texto(request.resource.data.autor, 1, 120)
+        && texto(request.resource.data.empresa, 0, 120)
+        && request.resource.data.creada == request.time;
+      allow update, delete: if false;
+    }
 
     // Todo lo demás, cerrado.
     match /{document=**} {

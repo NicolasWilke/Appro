@@ -1,6 +1,6 @@
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
 import type {
-  Comprador, Cotizacion, FrecuenciaAvisos, Persona, PedidoCotizacion, PlanId, Proveedor, RubroId, SolicitudContacto, Verificaciones,
+  Comprador, Cotizacion, FrecuenciaAvisos, Persona, PedidoCotizacion, PlanId, Proveedor, Resena, RubroId, SolicitudContacto, Verificaciones,
 } from '@/domain/types';
 
 /**
@@ -60,3 +60,10 @@ export const aSolicitud = (id: string, d: Datos): SolicitudContacto => ({
   id, proveedorId: d.proveedorId, compradorId: d.compradorId, motivo: d.motivo, estado: d.estado, creada: fechaIso(d.creada),
 });
 
+
+export function aResena(id: string, d: Datos): Resena {
+  return {
+    pedidoId: id, autor: d.autor ?? '', empresa: d.empresa ?? '', texto: d.texto ?? '',
+    entrega: d.entrega ?? 0, calidad: d.calidad ?? 0, facturacion: d.facturacion ?? 0, fecha: fechaIso(d.creada),
+  };
+}

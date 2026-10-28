@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useSesion } from '@/app/session';
 import { useQuery } from '@/data/DataProvider';
 import { REGIONES, RUBROS, region as regionDe, rubro } from '@/domain/catalogos';
 import type { FuenteValor, RegionId, RubroId, TipoValor } from '@/domain/types';
@@ -16,10 +17,12 @@ const FUENTE: Record<FuenteValor, { texto: string; tono: TonoPill }> = {
   estimado: { texto: 'Estimado', tono: 'senal' },
 };
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const mes = (iso: string) => `${MES[Number(iso.slice(5, 7)) - 1]}-${iso.slice(2, 4)}`;
+const mes = (iso = '') => (iso ? `${MES[Number(iso.slice(5, 7)) - 1]}-${iso.slice(2, 4)}` : '');
 
 export function ValoresReferencia() {
+  const { usuarioId } = useSesion();
   const { data } = useQuery((r) => r.valoresReferencia(), []);
+  const { data: admin } = useQuery((r) => r.esAdmin(usuarioId), [usuarioId]);
   const [rub, setRub] = useState<RubroId | ''>('');
   const [reg, setReg] = useState<RegionId | ''>('');
   const [tipo, setTipo] = useState<TipoValor | ''>('');
@@ -32,12 +35,13 @@ export function ValoresReferencia() {
     const ultimo = data.mesesIso[data.mesesIso.length - 1];
     return valoresPara(data.valores, { rubro: rub || undefined, region: reg || undefined, tipo: tipo || undefined }).map((v) => {
       const factor = ajustado ? factorInflacion(v.fecha, data.mesesIso, data.inflacion) : 1;
-      return { original: v, v: ajustar(v, factor), factor, viejo: !!v.fecha && v.fecha !== ultimo };
+      return { original: v, v: ajustar(v, factor), factor, viejo: !!v.fecha && !!ultimo && v.fecha !== ultimo };
     });
   }, [data, rub, reg, tipo, ajustado]);
 
   if (!data) return <div className="envoltura pagina" />;
-  const hayFechas = data.valores.some((v) => v.fecha && tieneValor(v));
+  // Sin serie de inflación cargada (base recién creada) no se ofrece el ajuste.
+  const hayFechas = data.mesesIso.length > 0 && data.valores.some((v) => v.fecha && tieneValor(v));
   const conValor = filas.filter((f) => tieneValor(f.v));
   const calc = conValor.find((f) => f.v.id === calcId) ?? conValor.find((f) => f.v.principal) ?? conValor[0];
   const cant = Number(cantidad) || 0;
@@ -48,6 +52,7 @@ export function ValoresReferencia() {
       <header className="pagina__cab">
         <p className="eyebrow">Valores de referencia</p>
         <h1>Cuánto se paga por hora, por unidad o por trabajo</h1>
+        {admin && <p><Link to="/admin/valores" className="btn btn--sec btn--chico">Editar valores</Link></p>}
         <p className="tenue">Rangos para armar un requerimiento o evaluar una cotización. Son una referencia, no un precio máximo ni mínimo: cada trabajo tiene sus condiciones.</p>
       </header>
 

@@ -155,6 +155,16 @@ El plan Spark no tiene Cloud Functions, así que nada corre en Firebase cuando s
 
 Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Viene apagado: primero cargá en GitHub los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend) y después borrá los `#` de las líneas `schedule` del archivo. Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
 
+### Valores de referencia editables
+
+Los valores se editan desde la web en `/admin/valores` (botón **Editar valores** en Valores de referencia), solo con una cuenta de administrador. Lo que se guarda va a `valoresReferencia/{id}` y pisa al valor del código con el mismo id; lo que no se tocó sigue saliendo de `src/data/valores-referencia.ts`.
+
+Para hacer administradora a una cuenta: en la consola, Authentication → copiá el **UID** de la cuenta → Firestore → **Iniciar colección** `admins` → ID del documento = ese UID → un campo cualquiera (por ejemplo `email`, string). O desde la terminal: `npm run admin -- hacer-admin mail@empresa.com`. En la demo, cualquiera puede probar el panel.
+
+### Reseñas
+
+Cuando un comprador adjudica un pedido, en ese mismo pedido aparece **Calificá a…**: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. Es una reseña por pedido (`resenas/{pedidoId}`), no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para el proveedor que lo ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.
+
 ### Qué cambia con el plan Spark
 
 - **Logos:** sin Storage, el logo se achica a 256 px en WebP y se guarda dentro del perfil (máximo ~150 KB, lo controlan las reglas). Con Blaze, `VITE_FIREBASE_STORAGE=true` y `npx firebase deploy --only storage` los pasa a Storage.
@@ -174,7 +184,7 @@ npm run test:reglas                      # prueba las reglas
 ### Dónde está
 
 - `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 42 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `tests/reglas/`: 47 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
 - `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
 - `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
 - `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
@@ -193,8 +203,11 @@ npm run test:reglas                      # prueba las reglas
 | `pedidos/{id}/cotizaciones/{prov}` | Cotizaciones | El comprador y quien cotizó | El proveedor |
 | `pedidos/{id}/avisos/{prov}` | A quién le llegó el mail | El comprador | Solo el servidor |
 | `solicitudesPlan/{uid}` | Pedidos de cambio de plan | El dueño | El dueño |
-| `valoresReferencia`, `indicePrecios`, `config` | Datos de referencia | Registrados | Solo el servidor (`sembrar`) |
+| `valoresReferencia/{id}` | Valores de referencia | Registrados | Administradores (`/admin/valores`) |
+| `indicePrecios`, `config` | Datos de referencia | Registrados | Solo el servidor (`sembrar`) |
 | `colaResumen/{prov}` | Avisos para el resumen diario | Nadie | Solo el servidor |
+| `admins/{uid}` | Cuentas que editan valores | Cada uno la suya | Solo la consola o `npm run admin` |
+| `resenas/{pedidoId}` | Reseña del comprador al proveedor adjudicado | Registrados | El comprador del pedido, una vez |
 
 ## Arquitectura
 
