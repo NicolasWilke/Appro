@@ -41,10 +41,10 @@ export const MENSAJES_FALLO: Record<CodigoFallo, string> = {
 
 /**
  * Contrato de autenticación y perfil. La demo usa DemoAuth (todo en el navegador);
- * con VITE_AUTH=firebase se usa FirebaseAuth. Las pantallas no saben cuál hay detrás.
+ * un backend real se suma como otra implementación. Las pantallas no saben cuál hay detrás.
  */
 export interface AuthService {
-  readonly modo: 'demo' | 'firebase';
+  readonly modo: 'demo' | 'real';
   /** true: el logo se guarda como imagen chica dentro del perfil (sin Storage). */
   readonly logoEnPerfil: boolean;
   /** Llama a `fn` con la cuenta actual (o null) y cada vez que cambia. Devuelve cómo desuscribirse. */

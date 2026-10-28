@@ -8,7 +8,6 @@ import { esMailCorporativo, esMailValido } from './validaciones';
  * - El comprador ve el contacto de los proveedores.
  * - El proveedor ve el contacto de un comprador solo si ese comprador aceptó su solicitud.
  * - Entre pares del mismo rol, no.
- * Es la misma política que firebase/firestore.rules; si cambia una, cambia la otra.
  */
 export function puedeVerContacto(lector: { uid: string; rol: Rol }, duenio: { uid: string; rol: Rol }, duenioAceptoAlLector = false): boolean {
   if (lector.uid === duenio.uid) return true;

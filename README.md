@@ -3,7 +3,7 @@
 **Marca:** nombre, lema, colores y logo están en `src/config/marca.ts`. Para cambiar el logo, reemplazá `src/assets/logo.png` (o poné `logo.svg` y cambiá la importación en ese archivo). El ícono de la pestaña es `public/favicon.png`.
 
 Prototipo navegable de la red comprador–proveedor descrita en `../Propuesta-Red-Comprador-Proveedor.pdf`.
-Las cuentas, el login y los perfiles pueden funcionar con Firebase de verdad (ver abajo). La red, los pedidos y las cotizaciones todavía son datos de ejemplo guardados en el navegador. Está armado para que este mismo código sea la base de producción.
+Funciona sin base de datos ni configuración: las cuentas, la red, los pedidos y las cotizaciones se guardan en el navegador de cada persona (localStorage). Cada navegador ve solo sus propios datos, así que sirve para mostrar y probar el producto, no para que varias empresas usen la misma red. Está armado para enchufarle un backend después sin tocar las pantallas.
 
 ## Correr
 
@@ -11,7 +11,6 @@ Las cuentas, el login y los perfiles pueden funcionar con Firebase de verdad (ve
 npm install
 npm run dev            # desarrollo en http://localhost:5173
 npm test               # reglas de dominio (CUIT, cupos, índice, acceso)
-npm run test:reglas    # reglas de Firestore y Storage en el emulador (necesita Java 11+)
 npm run build          # bundle de producción en dist/
 npm run build:artifact # HTML único para la demo publicada
 ```
@@ -65,136 +64,17 @@ Datos del alta: nombre de la empresa, nombre de contacto, email y teléfono de c
 | Comprador | No (solo el suyo) | **Sí** |
 | Proveedor | **Solo si ese comprador aceptó su solicitud** | No (solo el suyo) |
 
-El proveedor pide contacto con un motivo (cupo mensual según su plan). Cuando el comprador acepta, se crea `users/{comprador}/aceptados/{proveedor}` y desde ese momento las reglas le dejan leer el contacto. Si el comprador borra ese documento, el acceso se corta.
+El proveedor pide contacto con un motivo (cupo mensual según su plan). Cuando el comprador acepta, el proveedor pasa a ver su mail y teléfono. La regla está en `src/domain/acceso.ts`.
 
 El resto del perfil lo ve cualquier usuario registrado. Sin sesión no se ve nada.
 
-### Dos modos
+### Cuentas de ejemplo
 
-- **Demo** (por defecto, y la versión publicada): todo vive en el navegador, con datos de ejemplo y dos cuentas (Laura, compradora; Ramiro, proveedor; contraseña `demo1234`). No manda mails ni es segura.
-- **Firebase** (`VITE_AUTH=firebase`): cuentas en Firebase Authentication y **todos** los datos en Firestore: red, pedidos, cotizaciones, solicitudes de contacto, aceptaciones, valores de referencia e índice. Funciona con el plan gratuito (Spark).
+Vienen dos cuentas de ejemplo: Laura (compradora) y Ramiro (proveedor), contraseña `demo1234`. Las cuentas nuevas quedan guardadas en ese navegador. No sale ningún mail y no es seguro: es para mostrar el producto.
 
-## Firebase paso a paso (plan Spark)
+## Publicar en Netlify
 
-Necesitás Node 22 o más nuevo. **Las colecciones no se crean a mano:** Firestore crea cada una la primera vez que la app o un script escribe en ella. Una base vacía es el punto de partida correcto.
-
-**En la consola** ([console.firebase.google.com](https://console.firebase.google.com), proyecto APPRO):
-
-1. **Authentication → Comenzar → Método de acceso:** activá *Correo electrónico/contraseña*. En **Plantillas** poné el idioma en español.
-2. **Firestore Database:** ya la tenés creada. Si te pregunta, modo producción.
-3. **Configuración del proyecto (engranaje) → General → Tus apps → `</>` (Web):** registrá una app llamada APPRO, sin Hosting. Copiá los valores de `firebaseConfig`.
-4. **Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada:** se descarga un JSON. Guardalo en la carpeta del proyecto como `clave-servicio.json` (ya está en `.gitignore`; no lo compartas: da acceso total a la base).
-
-**En la carpeta del proyecto** (terminal de VS Code):
-
-```bash
-cp .env.example .env.local
-```
-
-En `.env.local` completá:
-
-```
-VITE_AUTH=firebase
-VITE_FIREBASE_API_KEY=        ← apiKey
-VITE_FIREBASE_AUTH_DOMAIN=    ← authDomain
-VITE_FIREBASE_PROJECT_ID=     ← projectId
-VITE_FIREBASE_STORAGE_BUCKET= ← storageBucket
-VITE_FIREBASE_MESSAGING_SENDER_ID= ← messagingSenderId
-VITE_FIREBASE_APP_ID=         ← appId
-VITE_FIREBASE_STORAGE=false
-FIREBASE_PROJECT_ID=          ← el mismo projectId
-GOOGLE_APPLICATION_CREDENTIALS=./clave-servicio.json
-```
-
-Después:
-
-```bash
-npm install
-npx firebase login                      # abre el navegador para entrar con tu cuenta de Google
-npx firebase use --add                  # elegí el proyecto APPRO y poné "default" como alias
-npx firebase deploy --only firestore    # publica las reglas y los índices
-npm run sembrar                         # carga rubros, catálogos y valores de referencia
-npm run dev                             # abrí http://localhost:5173 y registrate
-```
-
-`npm run sembrar` no pisa nada que ya exista. `npm run sembrar -- --forzar` lo reescribe y `--ejemplos` agrega un índice de precios ficticio para ver el gráfico (no lo uses en producción).
-
-**Administración** (también desde la terminal, usa la clave de servicio):
-
-```bash
-npm run admin -- pendientes                       # pedidos de cambio de plan
-npm run admin -- plan mail@proveedor.com pro      # activa un plan (gratis | pro | empresa)
-npm run admin -- verificar mail@proveedor.com     # marca CUIT, mail corporativo y cargo como revisados
-```
-
-Al registrarse, el CUIT se controla con su dígito verificador y con eso el proveedor ya recibe avisos de su rubro. `verificar` es la revisión manual que suma el sello completo en el perfil.
-
-### Publicar en Netlify
-
-El repositorio ya trae `netlify.toml` (compila con `npm run build` y publica `dist`) y `public/_redirects` (para que recargar una página interna no dé 404). En Netlify, **Site configuration → Environment variables**, cargá exactamente estas, con los mismos valores que `.env.local`:
-
-```
-VITE_AUTH=firebase
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID
-VITE_FIREBASE_EMULADORES=false
-VITE_FIREBASE_STORAGE=false
-```
-
-Las variables se leen al compilar: después de cambiarlas, **Deploys → Trigger deploy → Clear cache and deploy site**. En Firebase, **Authentication → Configuración → Dominios autorizados**, agregá el dominio de Netlify (por ejemplo `approsrl.netlify.app`).
-
-Para saber qué versión está publicada, mirá el pie de página: dice `Firebase · <id del proyecto>` o `modo demo`. Si dice `modo demo`, Netlify no está leyendo `VITE_AUTH=firebase`.
-
-### Mails de pedidos nuevos sin Cloud Functions
-
-El plan Spark no tiene Cloud Functions, así que nada corre en Firebase cuando se publica un pedido. El pedido queda guardado con `avisado: false` y `npm run avisos` hace el resto: busca los pedidos sin avisar, manda los mails, deja registro en `pedidos/{id}/avisos` (lo que ve el comprador) y lo marca avisado. `npm run avisos -- --resumen` manda los resúmenes diarios.
-
-Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Viene apagado: primero cargá en GitHub los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend) y después borrá los `#` de las líneas `schedule` del archivo. Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
-
-### Qué cambia con el plan Spark
-
-- **Logos:** sin Storage, el logo se achica a 256 px en WebP y se guarda dentro del perfil (máximo ~150 KB, lo controlan las reglas). Con Blaze, `VITE_FIREBASE_STORAGE=true` y `npx firebase deploy --only storage` los pasa a Storage.
-- **Cupos de los planes:** la app los respeta, pero un usuario con conocimientos técnicos podría saltearlos llamando a Firestore directo. Controlarlos en el servidor necesita Cloud Functions (Blaze).
-- **Cambio de plan:** el proveedor lo pide desde Planes y queda en `solicitudesPlan`. Lo activás vos con `npm run admin -- plan` después de cobrar.
-
-### Probar sin tocar el proyecto real
-
-```bash
-npm run emuladores                       # terminal 1
-# terminal 2, con VITE_FIREBASE_EMULADORES=true en .env.local:
-FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_PROJECT_ID=demo-appro npm run sembrar
-npm run dev
-npm run test:reglas                      # prueba las reglas
-```
-
-### Dónde está
-
-- `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 42 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
-- `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
-- `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
-- `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
-- `server/`: `sembrar.ts`, `avisos.ts` y `admin.ts`, con el SDK de administrador.
-
-**Modelo de datos:**
-
-| Colección | Qué guarda | Quién lee | Quién escribe |
-|---|---|---|---|
-| `users/{uid}` | Perfil público | Usuarios registrados | El dueño (sin rol ni CUIT) |
-| `users/{uid}/privado/contacto` | Mail y teléfono | Según la tabla de contacto | El dueño |
-| `users/{uid}/aceptados/{prov}` | Proveedores aceptados | El comprador y ese proveedor | El comprador |
-| `estado/{uid}` | Plan y verificación | Registrados | Solo el servidor |
-| `solicitudes/{id}` | Pedidos de contacto | El proveedor y el comprador | Crea el proveedor, responde el comprador |
-| `pedidos/{id}` | Pedidos de cotización | Registrados | El comprador |
-| `pedidos/{id}/cotizaciones/{prov}` | Cotizaciones | El comprador y quien cotizó | El proveedor |
-| `pedidos/{id}/avisos/{prov}` | A quién le llegó el mail | El comprador | Solo el servidor |
-| `solicitudesPlan/{uid}` | Pedidos de cambio de plan | El dueño | El dueño |
-| `valoresReferencia`, `indicePrecios`, `config` | Datos de referencia | Registrados | Solo el servidor (`sembrar`) |
-| `colaResumen/{prov}` | Avisos para el resumen diario | Nadie | Solo el servidor |
+El repositorio trae `netlify.toml` (compila con `npm run build` y publica `dist`) y `public/_redirects` (para que recargar una página interna no dé 404). No hace falta cargar ninguna variable de entorno. Conectá el repositorio de GitHub en Netlify y cada cambio en `main` se publica solo.
 
 ## Arquitectura
 
@@ -208,7 +88,7 @@ src/
   data/DataProvider.tsx useQuery con refresco por eventos (reemplazable por TanStack Query).
   i18n/                 Textos comunes y formatos (Intl) según la región.
   ui/                   Primitivas: sello, avatar, chips, medidores, modal, toasts.
-  auth/                 Sesión, alta, login, recuperación y perfil: DemoAuth o Firebase.
+  auth/                 Sesión, alta, login, recuperación y perfil (DemoAuth, en el navegador).
   features/             Una carpeta por módulo: landing, acceso, cuenta, red, panel, cotizaciones, precios, planes.
   styles/               Tokens de diseño (claro/oscuro) y estilos.
 ```
@@ -222,7 +102,7 @@ Decisiones:
 ## Qué falta para producción
 
 1. Backend y base (el envío de mails depende de esto: el navegador no puede mandar mails de forma segura) (sugerido: Postgres + API en Node/TypeScript, o Supabase para acelerar el piloto) implementando `Repository`, con una cola de trabajos para los avisos y un cron para el resumen diario.
-2. Pasar la red, los pedidos y las cotizaciones a Firestore (hoy solo cuentas y perfiles usan Firebase) y verificar el mail al registrarse.
+2. Cuentas reales con verificación de mail: otra implementación de `AuthService` en `src/auth/`.
 3. Validación de CUIT contra el padrón de ARCA (hoy solo dígito verificador).
 4. Cobro de suscripciones en pesos con ajuste trimestral (Mercado Pago u otro).
 5. Resumen semanal por mail, política de privacidad revisada por abogado y registro de la base ante la AAIP.
