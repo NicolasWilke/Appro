@@ -66,7 +66,7 @@ export function MiPerfil() {
             <p className="tenue">Ingresás con <span className="mono">{c.email}</span>.</p>
             <div className="acciones-sol">
               <button className="btn btn--sec" onClick={async () => {
-                try { await auth.restablecerPassword(c.email); avisar(auth.modo === 'demo' ? 'En esta versión no sale ningún mail.' : `Te mandamos un enlace a ${c.email} para cambiar la contraseña.`, 'info'); }
+                try { await auth.restablecerPassword(c.email); avisar(auth.modo === 'demo' ? 'En la demo no sale ningún mail. Con Firebase te llega el enlace.' : `Te mandamos un enlace a ${c.email} para cambiar la contraseña.`, 'info'); }
                 catch (e) { avisar(mensaje(e), 'error'); }
               }}>Cambiar contraseña</button>
               <button className="btn btn--ter" onClick={async () => { await auth.salir(); ir('/'); }}>Cerrar sesión</button>

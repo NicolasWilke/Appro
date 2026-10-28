@@ -75,7 +75,7 @@ export function Layout() {
             <p><strong>{t.marca}</strong> · {t.bajada} · {REGION.pais}</p>
             <p className="tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
           </div>
-          <p className="tenue mono">v0.1 · datos guardados en este navegador</p>
+          <p className="tenue mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</p>
         </div>
       </footer>
     </div>

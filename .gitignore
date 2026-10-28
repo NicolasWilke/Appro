@@ -3,4 +3,8 @@ dist
 dist-artifact
 .env
 .env.local
+.firebaserc
 *-debug.log
+.firebase
+clave-servicio*.json
+*-service-account*.json

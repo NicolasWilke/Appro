@@ -246,7 +246,7 @@ function Recuperar({ alVolver }: { alVolver: () => void }) {
       {estado === 'enviado' ? (
         <div className="form">
           <p>Si hay una cuenta con <strong>{email}</strong>, te llega un mail con un enlace para crear una contraseña nueva. Revisá también la carpeta de spam.</p>
-          {auth.modo === 'demo' && <p className="nota">En esta versión no sale ningún mail.</p>}
+          {auth.modo === 'demo' && <p className="nota">En la demo no sale ningún mail. Con Firebase activado, el enlace llega de verdad.</p>}
           <button className="btn btn--pri" onClick={alVolver}>Volver a iniciar sesión</button>
         </div>
       ) : (

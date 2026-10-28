@@ -1,4 +1,5 @@
-# Netlify: compila la app y sirve dist. No necesita variables de entorno.
+# Netlify: compila la app y sirve dist. Las variables VITE_* se cargan en
+# Site configuration → Environment variables (ver README, "Publicar en Netlify").
 [build]
   command = "npm run build"
   publish = "dist"

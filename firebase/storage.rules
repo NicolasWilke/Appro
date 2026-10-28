@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// APPRO · reglas de Storage
+// logos/{uid}/{archivo}: foto o logo de la empresa.
+//   - lo ven los usuarios registrados
+//   - solo el dueño sube, reemplaza o borra
+//   - solo PNG, JPG o WebP, hasta 2 MB (SVG no: puede llevar scripts)
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /logos/{uid}/{archivo} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(png|jpeg|webp)');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /{todo=**} {
+      allow read, write: if false;
+    }
+  }
+}

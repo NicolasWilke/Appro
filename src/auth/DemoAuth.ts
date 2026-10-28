@@ -5,7 +5,7 @@ import { FalloAuth, type AltaCuenta, type AuthService, type CambiosPerfil, type 
 /**
  * Autenticación simulada para la demo: cuentas y sesión en localStorage de este navegador.
  * Aplica la misma política de contacto que las reglas de Firestore. No es segura y no manda mails:
- * para producción se suma otra implementación con backend.
+ * en producción se usa FirebaseAuth.
  */
 const CLAVE = 'appro:cuentas:v1';
 export const PASSWORD_DEMO = 'demo1234';
@@ -119,7 +119,7 @@ export class DemoAuth implements AuthService {
   }
 
   async restablecerPassword(_email: string) {
-    // En la demo no sale ningún mail.
+    // En la demo no sale ningún mail. Firebase manda el enlace real.
     await new Promise((ok) => setTimeout(ok, 400));
   }
 

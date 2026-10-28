@@ -2,10 +2,14 @@ import { DemoAuth } from './DemoAuth';
 import type { AuthService } from './tipos';
 
 /**
- * Cuentas guardadas en el navegador. Para usar un backend real, se agrega otra
- * implementación de AuthService y se elige acá; las pantallas no cambian.
+ * VITE_AUTH=firebase usa Firebase (claves en .env.local); cualquier otro valor, la demo local.
+ * Firebase se carga aparte para que la demo publicada no lo incluya.
  */
 export async function crearAuth(): Promise<AuthService> {
+  if (import.meta.env.VITE_AUTH === 'firebase') {
+    const { crearFirebaseAuth } = await import('./firebase/FirebaseAuth');
+    return crearFirebaseAuth();
+  }
   return new DemoAuth();
 }
 
