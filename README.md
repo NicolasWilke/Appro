@@ -3,7 +3,7 @@
 **Marca:** nombre, lema, colores y logo están en `src/config/marca.ts`. Para cambiar el logo, reemplazá `src/assets/logo.png` (o poné `logo.svg` y cambiá la importación en ese archivo). El ícono de la pestaña es `public/favicon.png`.
 
 Prototipo navegable de la red comprador–proveedor descrita en `../Propuesta-Red-Comprador-Proveedor.pdf`.
-Con `VITE_AUTH=firebase` y `VITE_DATA_SOURCE=firebase`, las cuentas, la red, las solicitudes de contacto, los pedidos y las cotizaciones se guardan en Firebase (ver abajo). En la demo publicada siguen siendo datos de ejemplo guardados en el navegador. Está armado para que este mismo código sea la base de producción.
+Las cuentas, el login y los perfiles pueden funcionar con Firebase de verdad (ver abajo). La red, los pedidos y las cotizaciones todavía son datos de ejemplo guardados en el navegador. Está armado para que este mismo código sea la base de producción.
 
 ## Correr
 
@@ -56,7 +56,7 @@ Sección propia (`/valores`) que muestra rangos mínimo, mediana y máximo por h
 
 Para usar la red hay que registrarse. `/ingresar` tiene tres vistas: **Iniciar sesión**, **Registrarme** (comprador o proveedor) y **Recuperar contraseña**. Sin sesión solo se ven la portada y los planes.
 
-Datos del alta: nombre de la empresa, nombre de contacto, email y teléfono de contacto, categoría (rubro), sector, ubicación, CUIT (con dígito verificador) y contraseña (mínimo 6 caracteres). `/perfil` muestra esos datos, permite editarlos y subir la foto o logo de la empresa (PNG, JPG o WebP; se achica a 512 px antes de subir). El rol y el CUIT no se cambian desde la app.
+Datos del alta: nombre de la empresa, nombre de contacto, email y teléfono de contacto, categoría (rubro), sector, ubicación, CUIT (con dígito verificador) y contraseña (mínimo 6 caracteres). `/perfil` muestra esos datos, permite editarlos y subir la foto o logo de la empresa (PNG, JPG o WebP; se achica antes de guardarlo). El rol y el CUIT no se cambian desde la app.
 
 **Quién ve los datos de contacto (mail y teléfono):**
 
@@ -71,52 +71,130 @@ El resto del perfil lo ve cualquier usuario registrado. Sin sesión no se ve nad
 
 ### Dos modos
 
-- **Demo** (por defecto, y la versión publicada): cuentas guardadas en el navegador, con dos de ejemplo (Laura, compradora; Ramiro, proveedor; contraseña `demo1234`). No manda mails ni es segura.
-- **Firebase** (`VITE_AUTH=firebase`): Firebase Authentication, Firestore y Storage. El mail para recuperar la contraseña llega de verdad.
+- **Demo** (por defecto, y la versión publicada): todo vive en el navegador, con datos de ejemplo y dos cuentas (Laura, compradora; Ramiro, proveedor; contraseña `demo1234`). No manda mails ni es segura.
+- **Firebase** (`VITE_AUTH=firebase`): cuentas en Firebase Authentication y **todos** los datos en Firestore: red, pedidos, cotizaciones, solicitudes de contacto, aceptaciones, valores de referencia e índice. Funciona con el plan gratuito (Spark).
 
-### Poner Firebase en marcha
+## Firebase paso a paso (plan Spark)
 
-1. En [console.firebase.google.com](https://console.firebase.google.com) creá un proyecto (por ejemplo `appro-prod`).
-2. **Authentication → Método de acceso:** activá *Correo electrónico/contraseña*. En **Plantillas** cambiá el idioma a español y el nombre del remitente a APPRO. En **Configuración → Dominios autorizados** agregá tu dominio cuando lo tengas.
-3. **Firestore Database:** creala en modo producción, región `southamerica-east1` (San Pablo, la más cercana).
-4. **Storage:** activalo (pide el plan Blaze, de pago por uso; con pocos logos el costo es prácticamente cero, pero conviene poner una alerta de presupuesto).
-5. **Configuración del proyecto → Tus apps → Web:** registrá una app y copiá los valores de `firebaseConfig`.
-6. Copiá `.env.example` a `.env.local`, poné `VITE_AUTH=firebase` y completá las variables `VITE_FIREBASE_*`. Esas claves son públicas por diseño: lo que protege los datos son las reglas.
-7. Instalá dependencias y publicá las reglas:
+Necesitás Node 22 o más nuevo. **Las colecciones no se crean a mano:** Firestore crea cada una la primera vez que la app o un script escribe en ella. Una base vacía es el punto de partida correcto.
+
+**En la consola** ([console.firebase.google.com](https://console.firebase.google.com), proyecto APPRO):
+
+1. **Authentication → Comenzar → Método de acceso:** activá *Correo electrónico/contraseña*. En **Plantillas** poné el idioma en español.
+2. **Firestore Database:** ya la tenés creada. Si te pregunta, modo producción.
+3. **Configuración del proyecto (engranaje) → General → Tus apps → `</>` (Web):** registrá una app llamada APPRO, sin Hosting. Copiá los valores de `firebaseConfig`.
+4. **Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada:** se descarga un JSON. Guardalo en la carpeta del proyecto como `clave-servicio.json` (ya está en `.gitignore`; no lo compartas: da acceso total a la base).
+
+**En la carpeta del proyecto** (terminal de VS Code):
+
+```bash
+cp .env.example .env.local
+```
+
+En `.env.local` completá:
+
+```
+VITE_AUTH=firebase
+VITE_FIREBASE_API_KEY=        ← apiKey
+VITE_FIREBASE_AUTH_DOMAIN=    ← authDomain
+VITE_FIREBASE_PROJECT_ID=     ← projectId
+VITE_FIREBASE_STORAGE_BUCKET= ← storageBucket
+VITE_FIREBASE_MESSAGING_SENDER_ID= ← messagingSenderId
+VITE_FIREBASE_APP_ID=         ← appId
+VITE_FIREBASE_STORAGE=false
+FIREBASE_PROJECT_ID=          ← el mismo projectId
+GOOGLE_APPLICATION_CREDENTIALS=./clave-servicio.json
+```
+
+Después:
 
 ```bash
 npm install
-npx firebase login
-cp .firebaserc.example .firebaserc     # y poné el id de tu proyecto
-npm run test:reglas                   # opcional: prueba las reglas antes de publicarlas
-npx firebase deploy --only firestore:rules,storage
-npm run dev
+npx firebase login                      # abre el navegador para entrar con tu cuenta de Google
+npx firebase use --add                  # elegí el proyecto APPRO y poné "default" como alias
+npx firebase deploy --only firestore    # publica las reglas y los índices
+npm run sembrar                         # carga rubros, catálogos y valores de referencia
+npm run dev                             # abrí http://localhost:5173 y registrate
 ```
 
-Para probar todo sin tocar el proyecto real: `npm run emuladores` en una terminal y, en otra, `npm run dev` con `VITE_FIREBASE_EMULADORES=true` en `.env.local`.
+`npm run sembrar` no pisa nada que ya exista. `npm run sembrar -- --forzar` lo reescribe y `--ejemplos` agrega un índice de precios ficticio para ver el gráfico (no lo uses en producción).
+
+**Administración** (también desde la terminal, usa la clave de servicio):
+
+```bash
+npm run admin -- pendientes                       # pedidos de cambio de plan
+npm run admin -- plan mail@proveedor.com pro      # activa un plan (gratis | pro | empresa)
+npm run admin -- verificar mail@proveedor.com     # marca CUIT, mail corporativo y cargo como revisados
+```
+
+Al registrarse, el CUIT se controla con su dígito verificador y con eso el proveedor ya recibe avisos de su rubro. `verificar` es la revisión manual que suma el sello completo en el perfil.
+
+### Publicar en Netlify
+
+El repositorio ya trae `netlify.toml` (compila con `npm run build` y publica `dist`) y `public/_redirects` (para que recargar una página interna no dé 404). En Netlify, **Site configuration → Environment variables**, cargá exactamente estas, con los mismos valores que `.env.local`:
+
+```
+VITE_AUTH=firebase
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+VITE_FIREBASE_EMULADORES=false
+VITE_FIREBASE_STORAGE=false
+```
+
+Las variables se leen al compilar: después de cambiarlas, **Deploys → Trigger deploy → Clear cache and deploy site**. En Firebase, **Authentication → Configuración → Dominios autorizados**, agregá el dominio de Netlify (por ejemplo `approsrl.netlify.app`).
+
+Para saber qué versión está publicada, mirá el pie de página: dice `Firebase · <id del proyecto>` o `modo demo`. Si dice `modo demo`, Netlify no está leyendo `VITE_AUTH=firebase`.
+
+### Mails de pedidos nuevos sin Cloud Functions
+
+El plan Spark no tiene Cloud Functions, así que nada corre en Firebase cuando se publica un pedido. El pedido queda guardado con `avisado: false` y `npm run avisos` hace el resto: busca los pedidos sin avisar, manda los mails, deja registro en `pedidos/{id}/avisos` (lo que ve el comprador) y lo marca avisado. `npm run avisos -- --resumen` manda los resúmenes diarios.
+
+Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Viene apagado: primero cargá en GitHub los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend) y después borrá los `#` de las líneas `schedule` del archivo. Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
+
+### Qué cambia con el plan Spark
+
+- **Logos:** sin Storage, el logo se achica a 256 px en WebP y se guarda dentro del perfil (máximo ~150 KB, lo controlan las reglas). Con Blaze, `VITE_FIREBASE_STORAGE=true` y `npx firebase deploy --only storage` los pasa a Storage.
+- **Cupos de los planes:** la app los respeta, pero un usuario con conocimientos técnicos podría saltearlos llamando a Firestore directo. Controlarlos en el servidor necesita Cloud Functions (Blaze).
+- **Cambio de plan:** el proveedor lo pide desde Planes y queda en `solicitudesPlan`. Lo activás vos con `npm run admin -- plan` después de cobrar.
+
+### Probar sin tocar el proyecto real
+
+```bash
+npm run emuladores                       # terminal 1
+# terminal 2, con VITE_FIREBASE_EMULADORES=true en .env.local:
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_PROJECT_ID=demo-appro npm run sembrar
+npm run dev
+npm run test:reglas                      # prueba las reglas
+```
 
 ### Dónde está
 
-- `firebase/firestore.rules` y `firebase/storage.rules`: quién lee y escribe qué. Comentadas en castellano.
-- `tests/reglas/`: 29 tests de esas reglas contra el emulador (contacto solo tras aceptar, nadie se acepta a sí mismo, rol y CUIT fijos, solo imágenes de hasta 2 MB, etc.).
-- `src/domain/acceso.ts`: la misma política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
-- `src/auth/`: contrato `AuthService` con dos implementaciones, `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
-- Modelo en Firestore: `users/{uid}` (perfil público), `users/{uid}/privado/contacto` (mail y teléfono) y `users/{uid}/aceptados/{proveedor}` (aceptaciones del comprador). El contacto va aparte porque Firestore no puede ocultar campos dentro de un documento.
+- `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
+- `tests/reglas/`: 42 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
+- `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
+- `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
+- `server/`: `sembrar.ts`, `avisos.ts` y `admin.ts`, con el SDK de administrador.
 
-### Red, pedidos y cotizaciones en Firestore (`VITE_DATA_SOURCE=firebase`)
+**Modelo de datos:**
 
-`src/data/firebase/FirestoreRepository.ts` implementa el mismo `Repository` que la demo:
-
-- `personas/{uid}`: ficha de la red, sin mail ni teléfono. Se crea sola la primera vez que la cuenta inicia sesión. Verificaciones, reseñas y tasa de respuesta no las puede tocar el usuario.
-- `solicitudes/{id}`: las ven solo proveedor y comprador; las crea el proveedor (motivo de 40 a 300 caracteres) y las responde solo el comprador.
-- `pedidos/{id}` (código `PC-XXXXXX`): los ve cualquier registrado; los publica un comprador y solo él los adjudica, una vez, a quien cotizó.
-- `cotizaciones/{pedido}_{proveedor}`: una por proveedor y pedido; el comprador ve todas las de su pedido, cada proveedor solo la suya. No se editan.
-
-Pendiente:
-
-- **Cupos y plan:** el cupo mensual se cuenta a partir de lo enviado en el mes, pero se valida en el navegador; para que sea inviolable hace falta una Cloud Function. Mientras no haya cobro, el usuario puede cambiar su plan (está marcado en las reglas).
-- **Avisos por mail:** no salen hasta publicar el backend (`server/notificarPedido.ts`) como Cloud Function con Resend.
-- **Índice de precios y valores de referencia:** siguen saliendo del código (`data/mock/seed.ts`, `data/valores-referencia.ts`).
+| Colección | Qué guarda | Quién lee | Quién escribe |
+|---|---|---|---|
+| `users/{uid}` | Perfil público | Usuarios registrados | El dueño (sin rol ni CUIT) |
+| `users/{uid}/privado/contacto` | Mail y teléfono | Según la tabla de contacto | El dueño |
+| `users/{uid}/aceptados/{prov}` | Proveedores aceptados | El comprador y ese proveedor | El comprador |
+| `estado/{uid}` | Plan y verificación | Registrados | Solo el servidor |
+| `solicitudes/{id}` | Pedidos de contacto | El proveedor y el comprador | Crea el proveedor, responde el comprador |
+| `pedidos/{id}` | Pedidos de cotización | Registrados | El comprador |
+| `pedidos/{id}/cotizaciones/{prov}` | Cotizaciones | El comprador y quien cotizó | El proveedor |
+| `pedidos/{id}/avisos/{prov}` | A quién le llegó el mail | El comprador | Solo el servidor |
+| `solicitudesPlan/{uid}` | Pedidos de cambio de plan | El dueño | El dueño |
+| `valoresReferencia`, `indicePrecios`, `config` | Datos de referencia | Registrados | Solo el servidor (`sembrar`) |
+| `colaResumen/{prov}` | Avisos para el resumen diario | Nadie | Solo el servidor |
 
 ## Arquitectura
 

@@ -4,14 +4,25 @@ import { rubro } from '@/domain/catalogos';
 import { acumulada, variacionReal } from '@/domain/indice';
 import type { RubroId } from '@/domain/types';
 import { fmt } from '@/i18n';
-import { Chip, Pill } from '@/ui/primitivas';
+import { Chip, Pill, Vacio } from '@/ui/primitivas';
 import { GraficoIndice } from './GraficoIndice';
 
 export function IndicePrecios() {
   const { data } = useQuery((r) => r.indicePrecios(), []);
   const [sel, setSel] = useState<RubroId>('packaging');
   if (!data) return <div className="envoltura pagina" />;
-  const s = data.series.find((x) => x.rubro === sel)!;
+  if (!data.series.length) {
+    return (
+      <div className="envoltura pagina">
+        <header className="pagina__cab">
+          <p className="eyebrow">Índice de precios por rubro</p>
+          <h1>Cuánto cuesta lo que comprás, en términos reales</h1>
+        </header>
+        <Vacio titulo="Todavía no hay datos suficientes">El índice se arma con las medianas de las cotizaciones de la red. Aparece cuando cada rubro junta suficientes cotizaciones.</Vacio>
+      </div>
+    );
+  }
+  const s = data.series.find((x) => x.rubro === sel) ?? data.series[0];
   const infl12 = acumulada(data.inflacion);
   const nom12 = acumulada(s.variaciones);
   const real12 = variacionReal(nom12, infl12);

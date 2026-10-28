@@ -246,6 +246,7 @@ export class MockRepository implements Repository {
   async cambiarPlan(proveedorId: string, plan: Proveedor['plan']) {
     this.proveedor(proveedorId).plan = plan;
     this.guardar();
+    return 'activo' as const;
   }
 
   async embudo(proveedorId: string) {

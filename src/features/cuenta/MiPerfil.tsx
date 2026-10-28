@@ -90,7 +90,7 @@ function Logo() {
     if (!archivo) return;
     setSubiendo(true);
     try {
-      await auth.subirLogo(await prepararLogo(archivo));
+      await auth.subirLogo(await prepararLogo(archivo, auth.logoEnPerfil));
       avisar('Logo actualizado.');
     } catch (e) {
       avisar(mensaje(e), 'error');
@@ -110,7 +110,7 @@ function Logo() {
         <button className="btn btn--sec btn--chico" disabled={subiendo} onClick={() => entrada.current?.click()}>{subiendo ? 'Subiendo…' : p.logoUrl ? 'Cambiar foto o logo' : 'Subir foto o logo'}</button>
         {p.logoUrl && !subiendo && <button className="enlace" onClick={() => auth.quitarLogo().catch((e) => avisar(mensaje(e), 'error'))}>Quitar</button>}
       </div>
-      <span className="tenue logo-empresa__ayuda">PNG, JPG o WebP. Se ajusta a 512 px.</span>
+      <span className="tenue logo-empresa__ayuda">PNG, JPG o WebP. Se ajusta a {auth.logoEnPerfil ? 256 : 512} px.</span>
     </div>
   );
 }

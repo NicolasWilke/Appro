@@ -4,8 +4,9 @@ import { useResponderSolicitud } from '@/auth/AuthProvider';
 import { useQuery } from '@/data/DataProvider';
 import type { Comprador, Proveedor, SolicitudContacto } from '@/domain/types';
 import { fmt, t } from '@/i18n';
-import { Avatar, Chip, Copiable, Pill, Seccion, Vacio } from '@/ui/primitivas';
+import { Avatar, Chip, Pill, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
+import { ContactoPersona } from '../red/ContactoPersona';
 import { TarjetaProveedor } from '../red/TarjetaProveedor';
 
 export function PanelComprador() {
@@ -69,8 +70,7 @@ export function PanelComprador() {
               return (
                 <div key={s.id} className="contacto">
                   <div className="contacto__cab"><Avatar p={p} /><div><Link to={`/red/${p.id}`}><strong>{p.nombre} {p.apellido}</strong></Link><span className="tenue bloque-linea">{p.empresa}</span></div></div>
-                  <Copiable etiqueta="Mail" texto={p.contacto.email} />
-                  <Copiable etiqueta="Teléfono" texto={p.contacto.telefono} />
+                  <ContactoPersona p={p} />
                 </div>
               );
             })}

@@ -45,6 +45,8 @@ export const MENSAJES_FALLO: Record<CodigoFallo, string> = {
  */
 export interface AuthService {
   readonly modo: 'demo' | 'firebase';
+  /** true: el logo se guarda como imagen chica dentro del perfil (sin Storage). */
+  readonly logoEnPerfil: boolean;
   /** Llama a `fn` con la cuenta actual (o null) y cada vez que cambia. Devuelve cómo desuscribirse. */
   observar(fn: (c: Cuenta | null) => void): () => void;
   registrar(alta: AltaCuenta): Promise<Cuenta>;

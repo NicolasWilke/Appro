@@ -25,9 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!vigente) return;
       setAuth(a);
       desuscribir = a.observar(async (c) => {
-        // Si la ficha de la red no se puede guardar (por ejemplo, reglas sin publicar), la sesión igual entra.
-        if (c) await repo.sincronizarCuenta({ ...c.perfil, email: c.contacto.email, telefono: c.contacto.telefono })
-          .catch((e) => console.error('[APPRO] No se pudo guardar la ficha de la red:', e));
+        // Un fallo al reflejar la cuenta en los datos no puede dejar la sesión sin publicar.
+        if (c) await repo.sincronizarCuenta({ ...c.perfil, email: c.contacto.email, telefono: c.contacto.telefono }).catch((e) => console.error(e));
         setCuenta(c);
       });
     }, (e: Error) => setFallo(e.message));
@@ -58,7 +57,7 @@ export function useContacto(p: Persona | null | undefined, aceptadoLocal = false
   useEffect(() => {
     if (!posible || !p) { setContacto(null); return; }
     let vigente = true;
-    const local = respaldo ? p.contacto : null;
+    const local = respaldo && p.contacto.email ? p.contacto : null;
     auth.contactoDe(p.id).then((c) => vigente && setContacto(c ?? local), () => vigente && setContacto(local));
     return () => { vigente = false; };
   }, [auth, posible, respaldo, p]);

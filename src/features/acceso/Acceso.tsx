@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { CUENTAS_EJEMPLO, PASSWORD_DEMO } from '@/auth/DemoAuth';
 import { FalloAuth, MENSAJES_FALLO } from '@/auth/tipos';
@@ -28,6 +28,8 @@ export function Acceso() {
     setParams(p, { replace: true });
   };
 
+  // Si llegó acá redirigido (por ejemplo, justo después de crear la cuenta), lo devolvemos adonde iba.
+  if (cuenta && params.has('volver')) return <Navigate to={volver} replace />;
   if (cuenta) {
     return (
       <div className="envoltura acceso">

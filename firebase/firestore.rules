@@ -2,48 +2,73 @@ rules_version = '2';
 
 // APPRO · reglas de Firestore
 //
-// users/{uid}                    perfil público: empresa, contacto, categoría, sector, ubicación, CUIT, logo
-// users/{uid}/privado/contacto   datos de contacto: email y teléfono
-// users/{uid}/aceptados/{prov}   el comprador {uid} aceptó la solicitud del proveedor {prov}
-// personas/{uid}                 ficha de la red (sin mail ni teléfono)
-// solicitudes/{id}               pedido de contacto de un proveedor a un comprador
-// pedidos/{id}                   pedido de cotización de un comprador
-// cotizaciones/{pedido}_{prov}   una cotización por proveedor y pedido
+// users/{uid}                          perfil público: empresa, contacto, categoría, sector, ubicación, CUIT, logo
+// users/{uid}/privado/contacto         email y teléfono
+// users/{uid}/aceptados/{prov}         el comprador {uid} aceptó la solicitud del proveedor {prov}
+// estado/{uid}                         plan, verificaciones: solo lo escribe el equipo (consola o script)
+// solicitudes/{id}                     pedido de contacto de un proveedor a un comprador
+// pedidos/{id}                         pedido de cotización de un comprador
+// pedidos/{id}/cotizaciones/{prov}     la cotización de cada proveedor (una por proveedor)
+// pedidos/{id}/avisos/{prov}           a quién se avisó por mail (lo escribe el script de avisos)
+// solicitudesPlan/{uid}                el proveedor pide pasar a un plan pago
+// valoresReferencia/{id}, indicePrecios/{id}, config/{doc}   datos de referencia: solo lectura
 //
-// Firestore no puede ocultar campos dentro de un documento, por eso el contacto vive aparte.
-// Quién ve el contacto de quién:
+// Contacto (mail y teléfono):
 //   - el comprador ve el contacto de los proveedores
 //   - el proveedor ve el contacto de un comprador SOLO si ese comprador aceptó su solicitud
-//   - un proveedor NO ve el contacto de otro proveedor (ni un comprador el de otro comprador)
-// El rol se elige al registrarse y después no se puede cambiar desde la app.
-// La misma política está en src/domain/acceso.ts (puedeVerContacto) para que la interfaz no muestre
-// lo que estas reglas igual bloquearían.
+//   - entre proveedores, o entre compradores, no
+// La misma política está en src/domain/acceso.ts (puedeVerContacto).
+//
+// Las colecciones se crean solas la primera vez que la app escribe en ellas.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Ayudas
     function autenticado() { return request.auth != null; }
     function esDuenio(uid) { return autenticado() && request.auth.uid == uid; }
     function perfil(uid) { return get(/databases/$(database)/documents/users/$(uid)); }
     function tienePerfil() {
       return autenticado() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
-
+    function miRol() { return perfil(request.auth.uid).data.rol; }
+    function rolDe(uid) { return perfil(uid).data.rol; }
+    function texto(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     function textoOpcional(d, campo, max) {
       return !(campo in d) || (d[campo] is string && d[campo].size() <= max);
     }
+    function rubroValido(r) {
+      return r in ['packaging', 'frio', 'mantenimiento', 'etiquetas', 'quimicos', 'cargas', 'seguridad'];
+    }
+    function sinCambios(campos) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(campos);
+    }
+    function soloCambia(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    // ── Perfiles
+    function logoValido(d) {
+      return !('logoUrl' in d) || d.logoUrl == null
+        || (d.logoUrl is string && d.logoUrl.size() <= 200000
+            && (d.logoUrl.matches('^https://.*') || d.logoUrl.matches('^data:image/(png|jpeg|webp);base64,.*')));
+    }
 
     function perfilValido(d) {
-      return d.keys().hasOnly(['rol', 'empresa', 'contactoNombre', 'categoria', 'sector', 'ubicacion', 'cuit', 'logoUrl', 'creado', 'actualizado'])
+      return d.keys().hasOnly(['rol', 'empresa', 'contactoNombre', 'categoria', 'sector', 'ubicacion', 'cuit', 'logoUrl',
+                               'avisos', 'rubros', 'region', 'creado', 'actualizado'])
         && d.keys().hasAll(['rol', 'empresa', 'contactoNombre', 'categoria', 'ubicacion', 'cuit'])
         && d.rol in ['comprador', 'proveedor']
-        && d.empresa is string && d.empresa.size() >= 2 && d.empresa.size() <= 120
-        && d.contactoNombre is string && d.contactoNombre.size() >= 2 && d.contactoNombre.size() <= 80
-        && d.categoria is string && d.categoria.size() >= 2 && d.categoria.size() <= 40
-        && d.ubicacion is string && d.ubicacion.size() >= 2 && d.ubicacion.size() <= 120
+        && texto(d.empresa, 2, 120)
+        && texto(d.contactoNombre, 2, 80)
+        && rubroValido(d.categoria)
+        && texto(d.ubicacion, 2, 120)
         && d.cuit is string && d.cuit.matches('^[0-9]{2}-[0-9]{8}-[0-9]$')
         && textoOpcional(d, 'sector', 80)
-        && (!('logoUrl' in d) || d.logoUrl == null || (d.logoUrl is string && d.logoUrl.size() <= 2048));
+        && (!('avisos' in d) || d.avisos in ['inmediato', 'diario', 'pausado'])
+        && (!('rubros' in d) || (d.rubros is list && d.rubros.size() <= 7))
+        && (!('region' in d) || d.region in ['ros', 'amba', 'cba', 'noa', 'costa'])
+        && logoValido(d);
     }
 
     function contactoValido(d) {
@@ -57,8 +82,8 @@ service cloud.firestore {
     }
 
     function puedeVerContacto(uid) {
-      let lector = perfil(request.auth.uid).data.rol;
-      let duenio = perfil(uid).data.rol;
+      let lector = miRol();
+      let duenio = rolDe(uid);
       return (lector == 'proveedor' && duenio == 'comprador' && aceptoA(uid, request.auth.uid))
           || (lector == 'comprador' && duenio == 'proveedor');
     }
@@ -68,9 +93,7 @@ service cloud.firestore {
       allow read: if esDuenio(uid) || tienePerfil();
       allow create: if esDuenio(uid) && perfilValido(request.resource.data);
       // Rol, CUIT y fecha de alta quedan fijos.
-      allow update: if esDuenio(uid)
-        && perfilValido(request.resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol', 'cuit', 'creado']);
+      allow update: if esDuenio(uid) && perfilValido(request.resource.data) && sinCambios(['rol', 'cuit', 'creado']);
       // La baja la hace el equipo (Ley 25.326: supresión a pedido), no el cliente.
       allow delete: if false;
 
@@ -84,8 +107,8 @@ service cloud.firestore {
       match /aceptados/{prov} {
         allow read: if esDuenio(uid) || (autenticado() && request.auth.uid == prov);
         allow create: if esDuenio(uid)
-          && perfil(uid).data.rol == 'comprador'
-          && perfil(prov).data.rol == 'proveedor'
+          && rolDe(uid) == 'comprador'
+          && rolDe(prov) == 'proveedor'
           && request.resource.data.keys().hasOnly(['aceptado'])
           && request.resource.data.aceptado == request.time;
         allow update: if false;
@@ -93,129 +116,107 @@ service cloud.firestore {
       }
     }
 
-    // ── Red ──────────────────────────────────────────────────────────────
-    // Ficha pública de cada cuenta en la red. La escribe solo su dueño y nunca lleva datos de contacto.
-    // Las verificaciones, las reseñas y la tasa de respuesta las define el equipo, no el usuario.
-
-    function rolDe(uid) { return perfil(uid).data.rol; }
-    function esRol(rol) { return tienePerfil() && rolDe(request.auth.uid) == rol; }
-    function listaCorta(v, max) { return v is list && v.size() <= max; }
-
-    function personaValida(d, uid) {
-      return d.keys().hasOnly([
-          'rol', 'nombre', 'apellido', 'cargo', 'empresa', 'idFiscal', 'ciudad', 'region', 'rubros', 'verificaciones', 'logo',
-          'ventanaHasta', 'foco', 'acepta', 'noAcepta', 'tasaRespuesta', 'semiAnonimo', 'circulos',
-          'plan', 'desde', 'empleados', 'certificaciones', 'catalogo', 'cobertura', 'resenas', 'avisos',
-          'ts', 'actualizado'])
-        && d.rol == rolDe(uid)
-        && d.idFiscal == perfil(uid).data.cuit
-        && d.empresa is string && d.empresa.size() >= 2 && d.empresa.size() <= 120
-        && d.nombre is string && d.nombre.size() <= 80
-        && d.apellido is string && d.apellido.size() <= 80
-        && d.cargo is string && d.cargo.size() <= 80
-        && d.ciudad is string && d.ciudad.size() <= 120
-        && d.region in ['ros', 'amba', 'cba', 'noa', 'costa']
-        && listaCorta(d.rubros, 10) && d.rubros.size() >= 1
-        && (!('logo' in d) || d.logo == null || (d.logo is string && d.logo.size() <= 2048))
-        && (d.rol == 'comprador'
-              ? (!('plan' in d) && !('resenas' in d) && !('avisos' in d)
-                 && listaCorta(d.circulos, 20) && d.semiAnonimo is bool)
-              : (d.plan in ['gratis', 'pro', 'empresa'] && d.avisos in ['inmediato', 'diario', 'pausado']
-                 && listaCorta(d.certificaciones, 30) && listaCorta(d.catalogo, 50) && listaCorta(d.resenas, 200)
-                 && !('ventanaHasta' in d) && !('tasaRespuesta' in d)));
-    }
-
-    match /personas/{uid} {
+    // Plan y verificaciones: los define el equipo, nunca el usuario.
+    match /estado/{uid} {
       allow read: if tienePerfil();
-      allow create: if esDuenio(uid) && tienePerfil()
-        && personaValida(request.resource.data, uid)
-        && request.resource.data.verificaciones.cargoRevisado == false
-        && (request.resource.data.rol == 'proveedor'
-              ? (request.resource.data.resenas.size() == 0 && request.resource.data.plan == 'gratis')
-              : request.resource.data.tasaRespuesta == 0);
-      // Beta: el plan lo cambia el usuario porque todavía no hay cobro. Al activar el cobro, sacar 'plan' de lo editable.
-      allow update: if esDuenio(uid)
-        && personaValida(request.resource.data, uid)
-        && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['rol', 'idFiscal', 'verificaciones', 'resenas', 'tasaRespuesta', 'ts']);
-      allow delete: if false;
+      allow write: if false;
     }
 
-    // ── Solicitudes de contacto ──────────────────────────────────────────
-    // Las ven solo las dos partes. Las crea el proveedor; las responde solo el comprador.
-
+    // ── Solicitudes de contacto
     match /solicitudes/{id} {
       allow read: if autenticado()
         && (resource.data.proveedorId == request.auth.uid || resource.data.compradorId == request.auth.uid);
-      allow create: if esRol('proveedor')
-        && request.resource.data.keys().hasOnly(['proveedorId', 'compradorId', 'motivo', 'estado', 'creada', 'ts'])
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(['proveedorId', 'compradorId', 'motivo', 'estado', 'creada'])
         && request.resource.data.proveedorId == request.auth.uid
-        && request.resource.data.compradorId is string
+        && miRol() == 'proveedor'
         && rolDe(request.resource.data.compradorId) == 'comprador'
         && request.resource.data.estado == 'pendiente'
-        && request.resource.data.motivo is string
-        && request.resource.data.motivo.size() >= 40 && request.resource.data.motivo.size() <= 300
-        && request.resource.data.creada is string && request.resource.data.creada.size() == 10
-        && request.resource.data.ts == request.time;
+        && texto(request.resource.data.motivo, 40, 300)
+        && request.resource.data.creada == request.time;
+      // Solo el comprador responde, y solo cambia el estado.
       allow update: if autenticado()
         && resource.data.compradorId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'respondida'])
+        && soloCambia(['estado'])
+        && resource.data.estado in ['pendiente', 'postergada']
         && request.resource.data.estado in ['aceptada', 'postergada', 'rechazada'];
       allow delete: if false;
     }
 
-    // ── Pedidos de cotización ────────────────────────────────────────────
-    // Los ve cualquier usuario registrado. Los publica un comprador y solo él los adjudica, una vez,
-    // a un proveedor que efectivamente cotizó.
-
+    // ── Pedidos de cotización
     match /pedidos/{id} {
       allow read: if tienePerfil();
-      allow create: if esRol('comprador')
-        && request.resource.data.keys().hasOnly(['compradorId', 'titulo', 'rubro', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'estado', 'ts'])
+      allow create: if autenticado()
+        && miRol() == 'comprador'
+        && request.resource.data.keys().hasOnly(['compradorId', 'titulo', 'rubro', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'estado', 'creado', 'avisado'])
         && request.resource.data.compradorId == request.auth.uid
         && request.resource.data.estado == 'abierto'
-        && request.resource.data.titulo is string && request.resource.data.titulo.size() >= 3 && request.resource.data.titulo.size() <= 160
-        && request.resource.data.rubro is string && request.resource.data.rubro.size() <= 40
+        && request.resource.data.avisado == false
+        && request.resource.data.creado == request.time
+        && texto(request.resource.data.titulo, 6, 140)
+        && rubroValido(request.resource.data.rubro)
         && request.resource.data.cantidad is number && request.resource.data.cantidad > 0
-        && request.resource.data.unidad is string && request.resource.data.unidad.size() <= 40
-        && request.resource.data.entrega is string && request.resource.data.entrega.size() <= 200
-        && request.resource.data.pago is string && request.resource.data.pago.size() <= 120
-        && request.resource.data.zona is string && request.resource.data.zona.size() <= 120
-        && request.resource.data.cierre is string && request.resource.data.cierre.size() <= 40
-        && request.resource.data.ts == request.time;
+        && texto(request.resource.data.unidad, 1, 40)
+        && texto(request.resource.data.entrega, 1, 140)
+        && texto(request.resource.data.pago, 1, 60)
+        && texto(request.resource.data.zona, 0, 80)
+        && request.resource.data.cierre is string && request.resource.data.cierre.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      // El comprador adjudica a un proveedor que efectivamente cotizó.
       allow update: if autenticado()
         && resource.data.compradorId == request.auth.uid
         && resource.data.estado == 'abierto'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'adjudicadaA'])
+        && soloCambia(['estado', 'adjudicadaA'])
         && request.resource.data.estado == 'adjudicado'
-        && request.resource.data.adjudicadaA is string
-        && exists(/databases/$(database)/documents/cotizaciones/$(id + '_' + request.resource.data.adjudicadaA));
+        && exists(/databases/$(database)/documents/pedidos/$(id)/cotizaciones/$(request.resource.data.adjudicadaA));
+      allow delete: if false;
+
+      // Cada proveedor ve solo su cotización; el comprador ve todas las de su pedido.
+      match /cotizaciones/{prov} {
+        allow read: if autenticado()
+          && (request.auth.uid == prov || get(/databases/$(database)/documents/pedidos/$(id)).data.compradorId == request.auth.uid);
+        allow create: if autenticado()
+          && request.auth.uid == prov
+          && miRol() == 'proveedor'
+          && get(/databases/$(database)/documents/pedidos/$(id)).data.estado == 'abierto'
+          && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'precioUnitario', 'plazoDias', 'pago', 'nota', 'creada'])
+          && request.resource.data.pedidoId == id
+          && request.resource.data.proveedorId == prov
+          && request.resource.data.precioUnitario is number && request.resource.data.precioUnitario > 0
+          && request.resource.data.plazoDias is int && request.resource.data.plazoDias >= 0 && request.resource.data.plazoDias <= 365
+          && texto(request.resource.data.pago, 1, 60)
+          && texto(request.resource.data.nota, 0, 500)
+          && request.resource.data.creada == request.time;
+        allow update, delete: if false;
+      }
+
+      match /avisos/{prov} {
+        allow read: if autenticado() && get(/databases/$(database)/documents/pedidos/$(id)).data.compradorId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    // Para que el proveedor cuente sus propias cotizaciones (cupo del plan).
+    match /{camino=**}/cotizaciones/{prov} {
+      allow read: if autenticado() && resource.data.proveedorId == request.auth.uid;
+    }
+
+    // ── Planes: el proveedor lo pide, el equipo lo activa en estado/{uid}.
+    match /solicitudesPlan/{uid} {
+      allow read: if esDuenio(uid);
+      allow create, update: if esDuenio(uid)
+        && miRol() == 'proveedor'
+        && request.resource.data.keys().hasOnly(['plan', 'pedido'])
+        && request.resource.data.plan in ['gratis', 'pro', 'empresa']
+        && request.resource.data.pedido == request.time;
       allow delete: if false;
     }
 
-    // ── Cotizaciones ─────────────────────────────────────────────────────
-    // El comprador ve todas las de sus pedidos; cada proveedor, solo la suya.
-    // El id es {pedido}_{proveedor}: un proveedor cotiza una sola vez por pedido. No se editan ni se borran.
+    // ── Referencias: las carga el equipo (scripts/sembrar.ts o la consola).
+    match /valoresReferencia/{id} { allow read: if tienePerfil(); allow write: if false; }
+    match /indicePrecios/{id} { allow read: if tienePerfil(); allow write: if false; }
+    match /config/{doc} { allow read: if tienePerfil(); allow write: if false; }
 
-    match /cotizaciones/{id} {
-      allow read: if autenticado()
-        && (resource.data.compradorId == request.auth.uid || resource.data.proveedorId == request.auth.uid);
-      allow create: if esRol('proveedor')
-        && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'compradorId', 'precioUnitario', 'plazoDias', 'pago', 'nota', 'creada', 'ts'])
-        && request.resource.data.proveedorId == request.auth.uid
-        && id == request.resource.data.pedidoId + '_' + request.auth.uid
-        && get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.estado == 'abierto'
-        && request.resource.data.compradorId == get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.compradorId
-        && request.resource.data.precioUnitario is number && request.resource.data.precioUnitario > 0
-        && request.resource.data.plazoDias is int && request.resource.data.plazoDias >= 0 && request.resource.data.plazoDias <= 3650
-        && request.resource.data.pago is string && request.resource.data.pago.size() <= 120
-        && request.resource.data.nota is string && request.resource.data.nota.size() <= 600
-        && request.resource.data.creada is string && request.resource.data.creada.size() == 10
-        && request.resource.data.ts == request.time;
-      allow update, delete: if false;
-    }
-
-    // Todo lo demás, cerrado hasta que tenga reglas propias.
+    // Todo lo demás, cerrado.
     match /{document=**} {
       allow read, write: if false;
     }
