@@ -7,14 +7,14 @@ rules_version = '2';
 // users/{uid}/aceptados/{prov}         el comprador {uid} aceptó la solicitud del proveedor {prov}
 // estado/{uid}                         plan, verificaciones: solo lo escribe el equipo (consola o script)
 // solicitudes/{id}                     pedido de contacto de un proveedor a un comprador
-// pedidos/{id}                         pedido de cotización de un comprador
-// pedidos/{id}/cotizaciones/{prov}     la cotización de cada proveedor (una por proveedor)
+// pedidos/{id}                         pedido de cotización: ítems, cierre, privado/invitados, sobre cerrado
+// pedidos/{id}/cotizaciones/{prov}     la oferta de cada proveedor, ítem por ítem (una por proveedor)
 // pedidos/{id}/avisos/{prov}           a quién se avisó por mail (lo escribe el script de avisos)
 // solicitudesPlan/{uid}                el proveedor pide pasar a un plan pago
 // valoresReferencia/{id}               valores de referencia: los edita un administrador desde /admin/valores
 // indicePrecios/{id}, config/{doc}     datos de referencia: solo lectura
 // admins/{uid}                         cuentas del equipo que editan valores (se crean desde la consola)
-// resenas/{pedidoId}                   calificación del comprador al proveedor que ganó su pedido
+// resenas/{id}                         calificación del comprador a cada proveedor que ganó su pedido
 //
 // Contacto (mail y teléfono):
 //   - el comprador ve el contacto de los proveedores
@@ -147,48 +147,107 @@ service cloud.firestore {
     }
 
     // ── Pedidos de cotización
+    // Privado: solo lo ven el comprador, los invitados y quien lo ganó. Sobre cerrado: el comprador lee las
+    // ofertas recién después de cierraEn. Después de cierraEn nadie cotiza. Un pedido del formato anterior
+    // (sin "privado") lo ve solo su comprador hasta correr `npm run admin -- migrar-pedidos`.
+    // Cada condición se prueba contra las consultas de la app (privado == false, invitados o adjudicados
+    // array-contains, compradorId ==). Ojo: sumar algo como !('privado' in d) deja listar la colección entera.
+    function puedeVerPedido(d) {
+      return d.privado == false
+        || d.compradorId == request.auth.uid
+        || request.auth.uid in d.invitados
+        || request.auth.uid in d.adjudicados;
+    }
+    function preciosAbiertos(d) { return d.get('sobreCerrado', false) == false || request.time >= d.cierraEn; }
+    function recibeOfertas(d) { return d.estado == 'abierto' && (!('cierraEn' in d) || request.time < d.cierraEn); }
+    function pedido(id) { return get(/databases/$(database)/documents/pedidos/$(id)).data; }
+    function cotizo(id, prov) { return exists(/databases/$(database)/documents/pedidos/$(id)/cotizaciones/$(prov)); }
+    function lista(v, max) { return v is list && v.size() <= max; }
+    function camposPedido() {
+      return ['compradorId', 'titulo', 'descripcion', 'rubro', 'items', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'cierraEn',
+              'privado', 'invitados', 'sobreCerrado', 'documentos', 'adjuntos', 'ofertas', 'estado', 'creado', 'avisado'];
+    }
+    function pedidoNuevoValido(d) {
+      return d.keys().hasOnly(camposPedido()) && d.keys().hasAll(camposPedido())
+        && d.compradorId == request.auth.uid
+        && d.estado == 'abierto' && d.avisado == false && d.ofertas == 0
+        && d.creado == request.time
+        && texto(d.titulo, 6, 140)
+        && texto(d.descripcion, 0, 1000)
+        && rubroValido(d.rubro)
+        && d.items is list && d.items.size() >= 1 && d.items.size() <= 30
+        && d.cantidad is number && d.cantidad > 0
+        && texto(d.unidad, 1, 40)
+        && texto(d.entrega, 1, 140)
+        && texto(d.pago, 1, 60)
+        && texto(d.zona, 0, 80)
+        && d.cierre is string && d.cierre.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.cierraEn is timestamp && d.cierraEn > request.time
+        && d.privado is bool && d.sobreCerrado is bool
+        && lista(d.invitados, 30)
+        && (d.privado ? d.invitados.size() >= 1 : d.invitados.size() == 0)
+        && lista(d.documentos, 10)
+        && lista(d.adjuntos, 10);
+    }
+    // Hasta 5 proveedores adjudicados, cada uno con su oferta; el principal (adjudicadaA) va primero.
+    function adjudicacionValida(id, d) {
+      return d.adjudicados is list && d.adjudicados.size() >= 1 && d.adjudicados.size() <= 5
+        && d.adjudicados.toSet().size() == d.adjudicados.size()
+        && d.adjudicadaA == d.adjudicados[0]
+        && d.adjudicacion is map && d.adjudicacion.size() >= 1 && d.adjudicacion.size() <= resource.data.get('items', [0]).size()
+        && d.adjudicacion.values().toSet() == d.adjudicados.toSet()
+        && texto(d.get('comentarioAdjudicacion', ''), 0, 1000)
+        && cotizo(id, d.adjudicados[0])
+        && (d.adjudicados.size() < 2 || cotizo(id, d.adjudicados[1]))
+        && (d.adjudicados.size() < 3 || cotizo(id, d.adjudicados[2]))
+        && (d.adjudicados.size() < 4 || cotizo(id, d.adjudicados[3]))
+        && (d.adjudicados.size() < 5 || cotizo(id, d.adjudicados[4]));
+    }
+
     match /pedidos/{id} {
-      allow read: if tienePerfil();
-      allow create: if autenticado()
-        && miRol() == 'comprador'
-        && request.resource.data.keys().hasOnly(['compradorId', 'titulo', 'rubro', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'estado', 'creado', 'avisado'])
-        && request.resource.data.compradorId == request.auth.uid
-        && request.resource.data.estado == 'abierto'
-        && request.resource.data.avisado == false
-        && request.resource.data.creado == request.time
-        && texto(request.resource.data.titulo, 6, 140)
-        && rubroValido(request.resource.data.rubro)
-        && request.resource.data.cantidad is number && request.resource.data.cantidad > 0
-        && texto(request.resource.data.unidad, 1, 40)
-        && texto(request.resource.data.entrega, 1, 140)
-        && texto(request.resource.data.pago, 1, 60)
-        && texto(request.resource.data.zona, 0, 80)
-        && request.resource.data.cierre is string && request.resource.data.cierre.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
-      // El comprador adjudica a un proveedor que efectivamente cotizó.
-      allow update: if autenticado()
-        && resource.data.compradorId == request.auth.uid
-        && resource.data.estado == 'abierto'
-        && soloCambia(['estado', 'adjudicadaA'])
-        && request.resource.data.estado == 'adjudicado'
-        && exists(/databases/$(database)/documents/pedidos/$(id)/cotizaciones/$(request.resource.data.adjudicadaA));
+      allow read: if tienePerfil() && puedeVerPedido(resource.data);
+      allow create: if autenticado() && miRol() == 'comprador' && pedidoNuevoValido(request.resource.data);
+      allow update: if autenticado() && (
+        // El comprador adjudica (con sobre cerrado, después del cierre) a proveedores que cotizaron.
+        (resource.data.compradorId == request.auth.uid
+          && resource.data.estado == 'abierto'
+          && preciosAbiertos(resource.data)
+          && soloCambia(['estado', 'adjudicadaA', 'adjudicados', 'adjudicacion', 'comentarioAdjudicacion'])
+          && request.resource.data.estado == 'adjudicado'
+          && adjudicacionValida(id, request.resource.data))
+        // Un proveedor suma 1 al contador en el mismo lote en que crea su oferta.
+        || (miRol() == 'proveedor'
+          && recibeOfertas(resource.data)
+          && soloCambia(['ofertas'])
+          && request.resource.data.ofertas == resource.data.get('ofertas', 0) + 1
+          && !cotizo(id, request.auth.uid)
+          && existsAfter(/databases/$(database)/documents/pedidos/$(id)/cotizaciones/$(request.auth.uid)))
+      );
       allow delete: if false;
 
-      // Cada proveedor ve solo su cotización; el comprador ve todas las de su pedido.
+      // Cada proveedor ve solo su oferta; el comprador ve todas las de su pedido, con sobre cerrado después del cierre.
       match /cotizaciones/{prov} {
         allow read: if autenticado()
-          && (request.auth.uid == prov || get(/databases/$(database)/documents/pedidos/$(id)).data.compradorId == request.auth.uid);
+          && (request.auth.uid == prov || (pedido(id).compradorId == request.auth.uid && preciosAbiertos(pedido(id))));
         allow create: if autenticado()
           && request.auth.uid == prov
           && miRol() == 'proveedor'
-          && get(/databases/$(database)/documents/pedidos/$(id)).data.estado == 'abierto'
-          && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'precioUnitario', 'plazoDias', 'pago', 'nota', 'creada'])
+          && recibeOfertas(pedido(id))
+          && (pedido(id).get('privado', false) == false || prov in pedido(id).invitados)
+          && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'items', 'precioUnitario', 'plazoDias', 'vigencia', 'pago', 'nota', 'adjuntos', 'creada'])
+          && request.resource.data.keys().hasAll(['pedidoId', 'proveedorId', 'items', 'precioUnitario', 'plazoDias', 'vigencia', 'pago', 'nota', 'adjuntos', 'creada'])
           && request.resource.data.pedidoId == id
           && request.resource.data.proveedorId == prov
+          && request.resource.data.items is list && request.resource.data.items.size() == pedido(id).get('items', [0]).size()
           && request.resource.data.precioUnitario is number && request.resource.data.precioUnitario > 0
           && request.resource.data.plazoDias is int && request.resource.data.plazoDias >= 0 && request.resource.data.plazoDias <= 365
+          && request.resource.data.vigencia is string && request.resource.data.vigencia.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
           && texto(request.resource.data.pago, 1, 60)
           && texto(request.resource.data.nota, 0, 500)
-          && request.resource.data.creada == request.time;
+          && lista(request.resource.data.adjuntos, 10)
+          && request.resource.data.creada == request.time
+          // El contador del pedido sube en el mismo lote.
+          && getAfter(/databases/$(database)/documents/pedidos/$(id)).data.ofertas == pedido(id).get('ofertas', 0) + 1;
         allow update, delete: if false;
       }
 
@@ -249,17 +308,19 @@ service cloud.firestore {
     match /indicePrecios/{id} { allow read: if tienePerfil(); allow write: if false; }
     match /config/{doc} { allow read: if tienePerfil(); allow write: if false; }
 
-    // ── Reseñas: una por pedido, del comprador que lo publicó al proveedor que lo ganó. No se editan.
+    // ── Reseñas: una por pedido y proveedor ganador, del comprador que lo publicó. No se editan.
+    // El id es el del pedido para el proveedor principal (adjudicadaA) y "{pedido}--{proveedor}" para los demás.
     function puntaje(v) { return v is int && v >= 1 && v <= 5; }
-    match /resenas/{pedidoId} {
+    match /resenas/{rid} {
       allow read: if tienePerfil();
       allow create: if autenticado()
         && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'compradorId', 'entrega', 'calidad', 'facturacion', 'texto', 'autor', 'empresa', 'creada'])
-        && request.resource.data.pedidoId == pedidoId
         && request.resource.data.compradorId == request.auth.uid
-        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.compradorId == request.auth.uid
-        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.estado == 'adjudicado'
-        && get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.adjudicadaA == request.resource.data.proveedorId
+        && pedido(request.resource.data.pedidoId).compradorId == request.auth.uid
+        && pedido(request.resource.data.pedidoId).estado == 'adjudicado'
+        && ((rid == request.resource.data.pedidoId && pedido(request.resource.data.pedidoId).adjudicadaA == request.resource.data.proveedorId)
+          || (rid == request.resource.data.pedidoId + '--' + request.resource.data.proveedorId
+              && request.resource.data.proveedorId in pedido(request.resource.data.pedidoId).get('adjudicados', [])))
         && puntaje(request.resource.data.entrega)
         && puntaje(request.resource.data.calidad)
         && puntaje(request.resource.data.facturacion)

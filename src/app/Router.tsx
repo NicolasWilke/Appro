@@ -8,6 +8,8 @@ import { Perfil } from '@/features/red/Perfil';
 import { Panel } from '@/features/panel/Panel';
 import { Cotizaciones } from '@/features/cotizaciones/Cotizaciones';
 import { DetallePedido } from '@/features/cotizaciones/DetallePedido';
+import { NuevoPedido } from '@/features/cotizaciones/NuevoPedido';
+import { ResumenEjecutivo } from '@/features/cotizaciones/ResumenEjecutivo';
 import { IndicePrecios } from '@/features/precios/IndicePrecios';
 import { Planes } from '@/features/planes/Planes';
 import { Bandeja } from '@/features/mails/Bandeja';
@@ -34,7 +36,9 @@ const rutas = (
       <Route path="red" element={<Directorio />} />
       <Route path="red/:id" element={<Perfil />} />
       <Route path="cotizaciones" element={<Cotizaciones />} />
+      <Route path="cotizaciones/nuevo" element={<NuevoPedido />} />
       <Route path="cotizaciones/:id" element={<DetallePedido />} />
+      <Route path="cotizaciones/:id/resumen" element={<ResumenEjecutivo />} />
       <Route path="precios" element={<IndicePrecios />} />
       <Route path="mails" element={<Bandeja />} />
       <Route path="valores" element={<ValoresReferencia />} />

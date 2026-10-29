@@ -161,9 +161,23 @@ Los valores se editan desde la web en `/admin/valores` (botón **Editar valores*
 
 Para hacer administradora a una cuenta: en la consola, Authentication → copiá el **UID** de la cuenta → Firestore → **Iniciar colección** `admins` → ID del documento = ese UID → un campo cualquiera (por ejemplo `email`, string). O desde la terminal: `npm run admin -- hacer-admin mail@empresa.com`. En la demo, cualquiera puede probar el panel.
 
+### Pedidos de cotización (RFQ)
+
+Un pedido se arma en `/cotizaciones/nuevo`:
+
+- **Ítems:** hasta 30, cada uno con cantidad, unidad y detalle. El proveedor cotiza cada ítem con precio unitario, descuento e IVA (0, 10,5, 21 o 27 %), más plazo, vigencia de la oferta, condición de pago y enlaces.
+- **Cierre:** día y hora (18:00 por defecto, hora de Argentina). Pasada esa hora, las reglas no aceptan más ofertas.
+- **Público o privado:** el privado solo lo ven el comprador y los proveedores invitados (hasta 30), y solo ellos reciben el aviso.
+- **Sobre cerrado:** activado por defecto. El comprador ve cuántas ofertas llegaron, pero los precios recién al cierre; lo controlan las reglas, no la pantalla.
+- **Documentos y adjuntos:** el comprador pide documentos (lista sugerida u otros) y adjunta enlaces (Drive, Dropbox). Con el plan Spark no hay Storage, por eso son enlaces y no archivos.
+
+Al cerrar, el comparador muestra todas las ofertas lado a lado, con el **menor precio** por ítem y por total, y la **entrega más rápida**. Se adjudica todo a uno o ítem por ítem (hasta 5 ganadores), con una justificación. El **Resumen ejecutivo** (`/cotizaciones/{id}/resumen`) tiene 4 secciones (control, participación, matriz, adjudicación), se imprime o guarda en PDF y se manda por mail; puede mostrar solo los 3 finalistas.
+
+Los pedidos creados antes de esta versión no tienen los campos nuevos y, hasta migrarlos, solo los ve su comprador: `npm run admin -- migrar-pedidos`.
+
 ### Reseñas
 
-Cuando un comprador adjudica un pedido, en ese mismo pedido aparece **Calificá a…**: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. Es una reseña por pedido (`resenas/{pedidoId}`), no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para el proveedor que lo ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.
+Cuando un comprador adjudica, en el pedido aparece **Calificá a…** por cada ganador: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. La reseña del ganador principal es `resenas/{pedidoId}` y la de los demás `resenas/{pedidoId}--{proveedor}`; no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para un proveedor que ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.
 
 ### Qué cambia con el plan Spark
 
@@ -184,7 +198,7 @@ npm run test:reglas                      # prueba las reglas
 ### Dónde está
 
 - `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 47 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `tests/reglas/`: 60 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
 - `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
 - `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
 - `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.

@@ -1,3 +1,4 @@
+import { recibeOfertas } from '@/domain/rfq';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
@@ -26,7 +27,7 @@ function PerfilComprador({ c }: { c: Comprador }) {
   const { rol, usuarioId } = useSesion();
   const [abierto, setAbierto] = useState(false);
   const { data: enviadas } = useQuery((r) => rol === 'proveedor' ? r.solicitudesEnviadas(usuarioId) : Promise.resolve([]), [rol, usuarioId]);
-  const { data: pedidos } = useQuery((r) => r.listarPedidos({ compradorId: c.id }), [c.id]);
+  const { data: pedidos } = useQuery((r) => r.listarPedidos({ compradorId: c.id, visorId: usuarioId }), [c.id, usuarioId]);
   const sol = enviadas?.find((s) => s.compradorId === c.id && s.estado !== 'rechazada') ?? enviadas?.find((s) => s.compradorId === c.id);
   const directo = habilitaCanalDirecto(sol);
   const esYo = rol === 'comprador' && usuarioId === c.id;
@@ -56,14 +57,14 @@ function PerfilComprador({ c }: { c: Comprador }) {
           <p className="nota">Tu solicitud anterior se cerró. No mostramos rechazos: podés volver a intentar con otra propuesta.</p>
         )}
         <Seccion titulo="Pedidos de cotización abiertos">
-          {pedidos?.filter((p) => p.estado === 'abierto').map((p) => (
+          {pedidos?.filter((p) => recibeOfertas(p)).map((p) => (
             <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
               <span className="mono tenue">{p.id}</span>
               <span>{p.titulo}</span>
               <span className="tenue">Cierra {fmt.fecha(p.cierre)}</span>
             </Link>
           ))}
-          {pedidos && pedidos.filter((p) => p.estado === 'abierto').length === 0 && <p className="tenue">No tiene pedidos abiertos ahora.</p>}
+          {pedidos && pedidos.filter((p) => recibeOfertas(p)).length === 0 && <p className="tenue">No tiene pedidos abiertos ahora.</p>}
         </Seccion>
         {c.circulos.length > 0 && (
           <Seccion titulo="Círculos">

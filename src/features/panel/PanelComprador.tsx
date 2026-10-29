@@ -13,9 +13,8 @@ export function PanelComprador() {
   const { usuarioId } = useSesion();
   const { data } = useQuery(async (r) => {
     const yo = (await r.obtenerPersona(usuarioId)) as Comprador;
-    const [sols, provs, pedidos] = await Promise.all([r.solicitudesRecibidas(usuarioId), r.listarProveedores(), r.listarPedidos({ compradorId: usuarioId })]);
-    const cotis = await Promise.all(pedidos.map((p) => r.cotizacionesDe(p.id)));
-    return { yo, sols, provs, pedidos: pedidos.map((p, i) => ({ p, n: cotis[i].length })) };
+    const [sols, provs, pedidos] = await Promise.all([r.solicitudesRecibidas(usuarioId), r.listarProveedores(), r.listarPedidos({ compradorId: usuarioId, visorId: usuarioId })]);
+    return { yo, sols, provs, pedidos: pedidos.map((p) => ({ p, n: p.ofertas })) };
   }, [usuarioId]);
   if (!data) return <div className="envoltura pagina" />;
 
@@ -57,7 +56,7 @@ export function PanelComprador() {
               <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
                 <span className="mono tenue">{p.id}</span>
                 <span>{p.titulo}</span>
-                <span>{p.estado === 'adjudicado' ? <Pill tono="ok">{t.estado.adjudicado}</Pill> : <Pill tono={n ? 'sello' : 'neutro'}>{n} cotizaciones</Pill>}</span>
+                <span>{p.estado === 'adjudicado' ? <Pill tono="ok">{t.estado.adjudicado}</Pill> : <Pill tono={n ? 'sello' : 'neutro'}>{n} {n === 1 ? 'oferta' : 'ofertas'}</Pill>}</span>
               </Link>
             ))}
           </Seccion>

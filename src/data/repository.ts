@@ -4,7 +4,7 @@ import type {
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
 
-export type NuevoPedido = Omit<PedidoCotizacion, 'id' | 'estado' | 'adjudicadaA'>;
+export type NuevoPedido = Omit<PedidoCotizacion, 'id' | 'estado' | 'ofertas' | 'adjudicadaA' | 'adjudicados' | 'adjudicacion' | 'comentarioAdjudicacion'>;
 export type NuevaCotizacion = Omit<Cotizacion, 'id' | 'creada'>;
 
 /**
@@ -24,12 +24,22 @@ export interface Repository {
   enviarSolicitud(proveedorId: string, compradorId: string, motivo: string): Promise<SolicitudContacto>;
   responderSolicitud(id: string, estado: Exclude<EstadoSolicitud, 'pendiente'>): Promise<void>;
 
-  listarPedidos(filtro?: { compradorId?: string; rubros?: string[] }): Promise<PedidoCotizacion[]>;
+  /**
+   * Pedidos visibles para quien consulta: los propios (compradorId), o los públicos de esos rubros
+   * más los privados a los que lo invitaron (rubros). Un pedido privado no aparece para el resto.
+   * `visorId` es quien mira (Firestore lo toma de la sesión; la demo lo necesita explícito).
+   */
+  listarPedidos(filtro?: { compradorId?: string; rubros?: string[]; visorId?: string }): Promise<PedidoCotizacion[]>;
   obtenerPedido(id: string): Promise<PedidoCotizacion | null>;
   publicarPedido(pedido: NuevoPedido): Promise<PedidoCotizacion>;
+  /**
+   * El comprador ve todas las ofertas de su pedido (con sobre cerrado, recién después del cierre);
+   * un proveedor, solo la suya.
+   */
   cotizacionesDe(pedidoId: string): Promise<Cotizacion[]>;
   cotizar(cotizacion: NuevaCotizacion): Promise<Cotizacion>;
-  adjudicar(pedidoId: string, cotizacionId: string): Promise<void>;
+  /** Adjudica cada ítem a un proveedor (todos al mismo = adjudicación total). */
+  adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string): Promise<void>;
 
   /** A quién le llegó (o le va a llegar) el aviso de un pedido. Solo lo ve quien lo publicó. */
   avisosDePedido(pedidoId: string): Promise<{ proveedorId: string; empresa: string; via: 'mail' | 'resumen' }[]>;
@@ -45,9 +55,9 @@ export interface Repository {
   /** Si la cuenta puede editar los valores de referencia. */
   esAdmin(uid: string): Promise<boolean>;
 
-  /** La reseña del comprador para un pedido adjudicado, si ya la dejó. */
-  resenaDePedido(pedidoId: string): Promise<Resena | null>;
-  resenar(pedidoId: string, datos: DatosResena): Promise<void>;
+  /** Las reseñas que el comprador dejó en un pedido adjudicado: una por proveedor ganador. */
+  resenasDePedido(pedidoId: string): Promise<Resena[]>;
+  resenar(pedidoId: string, proveedorId: string, datos: DatosResena): Promise<void>;
 
   indicePrecios(): Promise<{ series: SerieIndice[]; inflacion: number[]; meses: string[] }>;
 

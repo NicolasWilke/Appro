@@ -48,8 +48,9 @@ export interface Resena {
   calidad: number;
   facturacion: number;
   fecha: string;
-  /** Pedido adjudicado que respalda la reseña (una por pedido) */
+  /** Pedido adjudicado que respalda la reseña (una por pedido y proveedor ganador) */
   pedidoId?: string;
+  proveedorId?: string;
 }
 
 export interface Proveedor extends PersonaBase {
@@ -77,29 +78,73 @@ export interface SolicitudContacto {
   creada: string;
 }
 
+/** Un renglón del pedido: lo que el comprador fija y el proveedor no puede cambiar. */
+export interface ItemPedido {
+  id: string;
+  nombre: string;
+  /** Descripción técnica (opcional) */
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+}
+
+/** Archivo compartido como enlace (Drive, Dropbox, web): el plan Spark no guarda archivos. */
+export interface Enlace { nombre: string; url: string }
+
 export interface PedidoCotizacion {
   id: string;
   compradorId: string;
   titulo: string;
+  /** Descripción general (opcional) */
+  descripcion: string;
   rubro: RubroId;
+  items: ItemPedido[];
+  /** Cantidad y unidad del primer ítem: lo usan el índice de precios y los avisos */
   cantidad: number;
   unidad: string;
   entrega: string;
   pago: string;
   zona: string;
+  /** Día de cierre, yyyy-mm-dd */
   cierre: string;
+  /** Momento exacto de cierre (ISO con zona horaria) */
+  cierraEn: string;
+  /** Privado: solo lo ven y cotizan los proveedores invitados */
+  privado: boolean;
+  invitados: string[];
+  /** Sobre cerrado: el comprador ve los precios recién después del cierre */
+  sobreCerrado: boolean;
+  /** Documentos que el proveedor tiene que presentar con su oferta */
+  documentos: string[];
+  adjuntos: Enlace[];
+  /** Cuántas ofertas llegaron (visible aunque los precios estén cerrados) */
+  ofertas: number;
   estado: 'abierto' | 'adjudicado';
+  /** Proveedor principal adjudicado (el de más ítems ganados) */
   adjudicadaA?: string;
+  /** Todos los proveedores con algún ítem adjudicado */
+  adjudicados?: string[];
+  /** Ítem → proveedor */
+  adjudicacion?: Record<string, string>;
+  comentarioAdjudicacion?: string;
 }
+
+/** Precio de un ítem en una oferta. Descuento e IVA en %. */
+export interface ItemCotizado { itemId: string; precioUnitario: number; descuento: number; iva: number }
 
 export interface Cotizacion {
   id: string;
   pedidoId: string;
   proveedorId: string;
+  items: ItemCotizado[];
+  /** Precio unitario del primer ítem, neto de descuento: lo usan el índice y las vistas resumidas */
   precioUnitario: number;
   plazoDias: number;
+  /** Hasta cuándo vale la oferta, yyyy-mm-dd */
+  vigencia: string;
   pago: string;
   nota: string;
+  adjuntos: Enlace[];
   creada: string;
 }
 

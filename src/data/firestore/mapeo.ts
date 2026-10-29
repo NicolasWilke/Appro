@@ -1,7 +1,8 @@
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
 import type {
-  Comprador, Cotizacion, FrecuenciaAvisos, Persona, PedidoCotizacion, PlanId, Proveedor, Resena, RubroId, SolicitudContacto, Verificaciones,
+  Comprador, Cotizacion, FrecuenciaAvisos, ItemPedido, Persona, PedidoCotizacion, PlanId, Proveedor, Resena, RubroId, SolicitudContacto, Verificaciones,
 } from '@/domain/types';
+import { cierreIso, isoArgentina, itemsCotizadosDe, itemsDe } from '@/domain/rfq';
 
 /**
  * De documentos de Firestore a los tipos del dominio. Sin dependencias del SDK:
@@ -45,16 +46,29 @@ export function aPersona(id: string, d: Datos, e: Estado = {}): Persona {
   return p;
 }
 
+
+/** Acepta el formato anterior (un solo ítem, cierre por día, sin privacidad) y lo completa. */
 export function aPedido(id: string, d: Datos): PedidoCotizacion {
+  const items = itemsDe(d as { titulo: string });
   return {
-    id, compradorId: d.compradorId, titulo: d.titulo, rubro: d.rubro, cantidad: d.cantidad, unidad: d.unidad, entrega: d.entrega,
-    pago: d.pago, zona: d.zona, cierre: d.cierre, estado: d.estado, ...(d.adjudicadaA ? { adjudicadaA: d.adjudicadaA } : {}),
+    id, compradorId: d.compradorId, titulo: d.titulo, descripcion: d.descripcion ?? '', rubro: d.rubro, items,
+    cantidad: items[0].cantidad, unidad: items[0].unidad, entrega: d.entrega, pago: d.pago, zona: d.zona ?? '',
+    cierre: d.cierre, cierraEn: d.cierraEn?.toDate ? isoArgentina(d.cierraEn.toDate()) : cierreIso(d.cierre, '23:59'),
+    privado: d.privado === true, invitados: d.invitados ?? [], sobreCerrado: d.sobreCerrado === true,
+    documentos: d.documentos ?? [], adjuntos: d.adjuntos ?? [], ofertas: d.ofertas ?? 0, estado: d.estado,
+    ...(d.adjudicadaA ? { adjudicadaA: d.adjudicadaA, adjudicados: d.adjudicados ?? [d.adjudicadaA] } : {}),
+    ...(d.adjudicacion ? { adjudicacion: d.adjudicacion } : d.adjudicadaA ? { adjudicacion: Object.fromEntries(items.map((i) => [i.id, d.adjudicadaA])) } : {}),
+    ...(d.comentarioAdjudicacion ? { comentarioAdjudicacion: d.comentarioAdjudicacion } : {}),
   };
 }
 
-export const aCotizacion = (id: string, d: Datos): Cotizacion => ({
-  id, pedidoId: d.pedidoId, proveedorId: d.proveedorId, precioUnitario: d.precioUnitario, plazoDias: d.plazoDias, pago: d.pago, nota: d.nota ?? '', creada: fechaIso(d.creada),
-});
+/** `itemsPedido` hace falta para traducir ofertas del formato anterior (sin ítems). */
+export function aCotizacion(id: string, d: Datos, itemsPedido: ItemPedido[] = []): Cotizacion {
+  return {
+    id, pedidoId: d.pedidoId, proveedorId: d.proveedorId, items: itemsCotizadosDe(d, itemsPedido), precioUnitario: d.precioUnitario,
+    plazoDias: d.plazoDias, vigencia: d.vigencia ?? '', pago: d.pago, nota: d.nota ?? '', adjuntos: d.adjuntos ?? [], creada: fechaIso(d.creada),
+  };
+}
 
 export const aSolicitud = (id: string, d: Datos): SolicitudContacto => ({
   id, proveedorId: d.proveedorId, compradorId: d.compradorId, motivo: d.motivo, estado: d.estado, creada: fechaIso(d.creada),
@@ -63,7 +77,7 @@ export const aSolicitud = (id: string, d: Datos): SolicitudContacto => ({
 
 export function aResena(id: string, d: Datos): Resena {
   return {
-    pedidoId: id, autor: d.autor ?? '', empresa: d.empresa ?? '', texto: d.texto ?? '',
+    pedidoId: d.pedidoId ?? id, proveedorId: d.proveedorId, autor: d.autor ?? '', empresa: d.empresa ?? '', texto: d.texto ?? '',
     entrega: d.entrega ?? 0, calidad: d.calidad ?? 0, facturacion: d.facturacion ?? 0, fecha: fechaIso(d.creada),
   };
 }

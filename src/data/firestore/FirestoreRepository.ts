@@ -1,13 +1,14 @@
 import {
-  addDoc, collection, collectionGroup, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where,
+  addDoc, collection, collectionGroup, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
-import { ReglaDeNegocioError, validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
+import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
   Comprador, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
 import { valores as valoresBase } from '../valores-referencia';
 import type { NuevaCotizacion, NuevoPedido, Repository } from '../repository';
@@ -68,7 +69,7 @@ export class FirestoreRepository implements Repository {
     }
     if (rol === 'comprador') {
       // La "ventana de compra" de un comprador es el cierre de su pedido abierto más lejano.
-      const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('estado', '==', 'abierto')));
+      const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('estado', '==', 'abierto'), where('privado', '==', false)));
       const cierre = new Map<string, string>();
       for (const d of abiertos.docs) {
         const p = d.data();
@@ -87,7 +88,7 @@ export class FirestoreRepository implements Repository {
     if (!d.exists()) return null;
     const p = aPersona(d.id, d.data(), e.data() as Estado | undefined);
     if (p.rol === 'comprador') {
-      const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('compradorId', '==', id), where('estado', '==', 'abierto')));
+      const abiertos = await getDocs(query(collection(this.db, 'pedidos'), where('compradorId', '==', id), where('estado', '==', 'abierto'), where('privado', '==', false)));
       p.ventanaHasta = abiertos.docs.map((x) => x.data().cierre as string).sort().pop() ?? null;
     } else {
       p.resenas = (await this.resenas(id)).get(id) ?? [];
@@ -121,33 +122,49 @@ export class FirestoreRepository implements Repository {
   }
 
   // ── Pedidos y cotizaciones
-  async listarPedidos(f?: { compradorId?: string; rubros?: string[] }) {
+  // Las consultas tienen que poder probarse contra las reglas: por eso los pedidos ajenos se piden
+  // en dos tandas (públicos e invitaciones) y nunca la colección entera.
+  async listarPedidos(f?: { compradorId?: string; rubros?: string[]; visorId?: string }) {
     const base = collection(this.db, 'pedidos');
-    const q = f?.compradorId ? query(base, where('compradorId', '==', f.compradorId)) : base;
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => aPedido(d.id, d.data()))
-      .filter((p) => !f?.rubros || f.rubros.includes(p.rubro))
-      .sort((a, b) => b.cierre.localeCompare(a.cierre));
+    const uid = this.yo();
+    let docs;
+    if (f?.compradorId) {
+      const q = f.compradorId === uid ? query(base, where('compradorId', '==', uid)) : query(base, where('compradorId', '==', f.compradorId), where('privado', '==', false));
+      docs = (await getDocs(q)).docs;
+    } else {
+      const [publicos, invitado] = await Promise.all([getDocs(query(base, where('privado', '==', false))), getDocs(query(base, where('invitados', 'array-contains', uid)))]);
+      const invitaciones = new Set(invitado.docs.map((d) => d.id));
+      docs = [...invitado.docs, ...publicos.docs.filter((d) => !invitaciones.has(d.id))];
+    }
+    return docs.map((d) => aPedido(d.id, d.data()))
+      .filter((p) => !f?.rubros || f.rubros.includes(p.rubro) || p.invitados.includes(uid))
+      .sort((a, b) => b.cierraEn.localeCompare(a.cierraEn));
   }
   async obtenerPedido(id: string) {
-    const d = await getDoc(doc(this.db, 'pedidos', id));
-    return d.exists() ? aPedido(d.id, d.data()) : null;
+    const d = await getDoc(doc(this.db, 'pedidos', id)).catch(() => null);
+    return d?.exists() ? aPedido(d.id, d.data()) : null;
   }
   async publicarPedido(nuevo: NuevoPedido) {
+    validarPedido(nuevo);
     const id = `PC-${Date.now().toString(36).slice(-6).toUpperCase()}`;
-    await setDoc(doc(this.db, 'pedidos', id), { ...nuevo, estado: 'abierto', creado: serverTimestamp(), avisado: false });
-    return this.tocar({ ...nuevo, id, estado: 'abierto' as const });
+    const { cierraEn, ...resto } = nuevo;
+    await setDoc(doc(this.db, 'pedidos', id), {
+      ...resto, invitados: nuevo.privado ? nuevo.invitados : [], cierraEn: Timestamp.fromDate(new Date(cierraEn)),
+      ofertas: 0, estado: 'abierto', creado: serverTimestamp(), avisado: false,
+    });
+    return this.tocar({ ...nuevo, id, ofertas: 0, estado: 'abierto' as const });
   }
-  /** El comprador ve todas las cotizaciones de su pedido; un proveedor, solo la suya. */
   async cotizacionesDe(pedidoId: string) {
     const uid = this.yo();
     const pedido = await this.obtenerPedido(pedidoId);
-    if (pedido?.compradorId === uid) {
+    if (!pedido) return [];
+    if (pedido.compradorId === uid) {
+      if (!preciosVisibles(pedido)) return [];
       const snap = await getDocs(collection(this.db, 'pedidos', pedidoId, 'cotizaciones'));
-      return snap.docs.map((d) => aCotizacion(d.id, d.data())).sort((a, b) => a.precioUnitario - b.precioUnitario);
+      return snap.docs.map((d) => aCotizacion(d.id, d.data(), pedido.items)).sort((a, b) => a.precioUnitario - b.precioUnitario);
     }
     const mia = await getDoc(doc(this.db, 'pedidos', pedidoId, 'cotizaciones', uid)).catch(() => null);
-    return mia?.exists() ? [aCotizacion(mia.id, mia.data())] : [];
+    return mia?.exists() ? [aCotizacion(mia.id, mia.data(), pedido.items)] : [];
   }
   async cotizar(nueva: NuevaCotizacion) {
     const [prov, pedido, uso, ya] = await Promise.all([
@@ -156,15 +173,25 @@ export class FirestoreRepository implements Repository {
     ]);
     if (!pedido) throw new Error('Pedido inexistente');
     validarRespuestaPedido({ plan: (prov as Proveedor).plan, uso, pedidoAbierto: pedido.estado === 'abierto', yaCotizo: ya.exists() });
-    if (!(nueva.precioUnitario > 0)) throw new ReglaDeNegocioError('MOTIVO_CORTO', 'Indicá un precio unitario mayor a cero.');
-    await setDoc(doc(this.db, 'pedidos', nueva.pedidoId, 'cotizaciones', nueva.proveedorId), {
+    validarCotizacion(pedido, nueva);
+    // La oferta y el contador del pedido van juntos: las reglas exigen las dos cosas a la vez.
+    const lote = writeBatch(this.db);
+    lote.set(doc(this.db, 'pedidos', nueva.pedidoId, 'cotizaciones', nueva.proveedorId), {
       ...nueva, plazoDias: Math.round(nueva.plazoDias), nota: nueva.nota ?? '', creada: serverTimestamp(),
     });
+    lote.update(doc(this.db, 'pedidos', nueva.pedidoId), { ofertas: increment(1) });
+    await lote.commit();
     return this.tocar({ ...nueva, id: nueva.proveedorId, creada: hoyIso() });
   }
-  async adjudicar(pedidoId: string, cotizacionId: string) {
-    // El id de la cotización es el uid del proveedor.
-    await updateDoc(doc(this.db, 'pedidos', pedidoId), { estado: 'adjudicado', adjudicadaA: cotizacionId });
+  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string) {
+    const pedido = await this.obtenerPedido(pedidoId);
+    if (!pedido) throw new Error('Pedido inexistente');
+    validarAdjudicacion(pedido, await this.cotizacionesDe(pedidoId), asignacion);
+    const adjudicados = adjudicadosDe(asignacion);
+    // El id de cada cotización es el uid del proveedor.
+    await updateDoc(doc(this.db, 'pedidos', pedidoId), {
+      estado: 'adjudicado', adjudicadaA: adjudicados[0], adjudicados, adjudicacion: asignacion, comentarioAdjudicacion: comentario.trim(),
+    });
     this.tocar(undefined);
   }
 
@@ -210,18 +237,19 @@ export class FirestoreRepository implements Repository {
     try { return (await getDoc(doc(this.db, 'admins', uid))).exists(); } catch { return false; }
   }
 
-  // ── Reseñas
-  async resenaDePedido(pedidoId: string) {
-    const d = await getDoc(doc(this.db, 'resenas', pedidoId));
-    return d.exists() ? aResena(d.id, d.data()) : null;
+  // ── Reseñas: una por proveedor ganador. La del principal usa el id del pedido (formato anterior).
+  async resenasDePedido(pedidoId: string) {
+    const snap = await getDocs(query(collection(this.db, 'resenas'), where('pedidoId', '==', pedidoId)));
+    return snap.docs.map((d) => aResena(d.id, d.data()));
   }
-  async resenar(pedidoId: string, datos: DatosResena) {
+  async resenar(pedidoId: string, proveedorId: string, datos: DatosResena) {
     validarResena(datos);
     const pedido = await this.obtenerPedido(pedidoId);
-    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicadaA) throw new Error('Solo se reseña un pedido adjudicado.');
+    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicados?.includes(proveedorId)) throw new Error('Solo se reseña a un proveedor que ganó el pedido.');
     const yo = (await this.obtenerPersona(this.yo())) as Comprador | null;
-    await setDoc(doc(this.db, 'resenas', pedidoId), {
-      pedidoId, proveedorId: pedido.adjudicadaA, compradorId: this.yo(),
+    const id = proveedorId === pedido.adjudicadaA ? pedidoId : `${pedidoId}--${proveedorId}`;
+    await setDoc(doc(this.db, 'resenas', id), {
+      pedidoId, proveedorId, compradorId: this.yo(),
       entrega: datos.entrega, calidad: datos.calidad, facturacion: datos.facturacion, texto: datos.texto.trim(),
       autor: yo ? `${yo.nombre} ${yo.apellido}`.trim() : 'Comprador', empresa: yo?.empresa ?? '',
       creada: serverTimestamp(),
@@ -256,7 +284,7 @@ export class FirestoreRepository implements Repository {
   async embudo(proveedorId: string): Promise<Embudo> {
     const [enviadas, ganadas] = await Promise.all([
       this.solicitudesEnviadas(proveedorId),
-      getDocs(query(collection(this.db, 'pedidos'), where('adjudicadaA', '==', proveedorId))),
+      getDocs(query(collection(this.db, 'pedidos'), where('adjudicados', 'array-contains', proveedorId))),
     ]);
     const aceptadas = enviadas.filter((s) => s.estado === 'aceptada').length;
     return { vistas: 0, solicitudes: enviadas.length, aceptadas, reuniones: aceptadas, ganadas: ganadas.size };

@@ -1,9 +1,10 @@
 import { REGION } from '@/config/region';
-import { ReglaDeNegocioError, validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
+import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
 import type { Comprador, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido } from '@/domain/rfq';
 import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
 import * as seed from './seed';
@@ -22,7 +23,7 @@ interface Estado {
   valores?: Record<string, ValorReferencia>;
 }
 
-const CLAVE = 'appro:demo:v2';
+const CLAVE = 'appro:demo:v3';
 const URL_PUBLICA = import.meta.env.VITE_PUBLIC_URL ?? 'https://appro.com.ar';
 const hoy = () => new Date().toISOString().slice(0, 10);
 const clonar = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -31,6 +32,7 @@ const inicial = (): Estado => {
     compradores: seed.compradores, proveedores: seed.proveedores, solicitudes: seed.solicitudes,
     pedidos: seed.pedidos, cotizaciones: seed.cotizaciones, usos: seed.usos, mails: [], colaResumen: {},
   });
+  for (const p of e.pedidos) p.ofertas = e.cotizaciones.filter((c) => c.pedidoId === p.id).length;
   // La bandeja de la demo arranca con los avisos del pedido más reciente.
   notificar(e, e.pedidos.find((p) => p.id === 'PC-2619')!);
   return e;
@@ -168,16 +170,19 @@ export class MockRepository implements Repository {
     this.guardar();
   }
 
-  async listarPedidos(f?: { compradorId?: string; rubros?: string[] }) {
+  async listarPedidos(f?: { compradorId?: string; rubros?: string[]; visorId?: string }) {
+    const visible = (p: PedidoCotizacion) => !p.privado || p.compradorId === f?.visorId || (!!f?.visorId && p.invitados.includes(f.visorId));
     return this.estado.pedidos
-      .filter((p) => (!f?.compradorId || p.compradorId === f.compradorId) && (!f?.rubros || f.rubros.includes(p.rubro)))
-      .sort((a, b) => b.id.localeCompare(a.id));
+      .filter((p) => visible(p) && (!f?.compradorId || p.compradorId === f.compradorId)
+        && (!f?.rubros || f.rubros.includes(p.rubro) || (!!f.visorId && p.invitados.includes(f.visorId))))
+      .sort((a, b) => b.cierraEn.localeCompare(a.cierraEn));
   }
   async obtenerPedido(id: string) { return this.estado.pedidos.find((p) => p.id === id) ?? null; }
 
   async publicarPedido(nuevo: Parameters<Repository['publicarPedido']>[0]) {
+    validarPedido(nuevo);
     const ultimo = Math.max(...this.estado.pedidos.map((p) => Number(p.id.split('-')[1])));
-    const p: PedidoCotizacion = { ...nuevo, id: `PC-${ultimo + 1}`, estado: 'abierto' };
+    const p: PedidoCotizacion = { ...clonar(nuevo), invitados: nuevo.privado ? [...nuevo.invitados] : [], id: `PC-${ultimo + 1}`, ofertas: 0, estado: 'abierto' };
     this.estado.pedidos.push(p);
     notificar(this.estado, p);
     this.guardar();
@@ -197,20 +202,21 @@ export class MockRepository implements Repository {
       plan: prov.plan, uso, pedidoAbierto: pedido.estado === 'abierto',
       yaCotizo: this.estado.cotizaciones.some((c) => c.pedidoId === pedido.id && c.proveedorId === prov.id),
     });
-    if (!(nueva.precioUnitario > 0)) throw new ReglaDeNegocioError('MOTIVO_CORTO', 'Indicá un precio unitario mayor a cero.');
-    const c: Cotizacion = { ...nueva, id: this.id('c'), creada: hoy() };
+    validarCotizacion(pedido, nueva);
+    const c: Cotizacion = { ...clonar(nueva), id: this.id('c'), creada: hoy() };
     this.estado.cotizaciones.push(c);
+    pedido.ofertas++;
     uso.respuestasUsadas++;
     this.guardar();
     return c;
   }
 
-  async adjudicar(pedidoId: string, cotizacionId: string) {
+  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string) {
     const p = this.estado.pedidos.find((x) => x.id === pedidoId);
-    const c = this.estado.cotizaciones.find((x) => x.id === cotizacionId);
-    if (!p || !c) throw new Error('Pedido o cotización inexistente');
-    p.estado = 'adjudicado';
-    p.adjudicadaA = c.proveedorId;
+    if (!p) throw new Error('Pedido inexistente');
+    validarAdjudicacion(p, await this.cotizacionesDe(pedidoId), asignacion);
+    const adjudicados = adjudicadosDe(asignacion);
+    Object.assign(p, { estado: 'adjudicado', adjudicadaA: adjudicados[0], adjudicados, adjudicacion: { ...asignacion }, comentarioAdjudicacion: comentario.trim() });
     this.guardar();
   }
 
@@ -253,22 +259,18 @@ export class MockRepository implements Repository {
   /** En la demo cualquiera puede probar el panel de administración. */
   async esAdmin() { return true; }
 
-  async resenaDePedido(pedidoId: string) {
-    for (const p of this.estado.proveedores) {
-      const r = p.resenas.find((x) => x.pedidoId === pedidoId);
-      if (r) return r;
-    }
-    return null;
+  async resenasDePedido(pedidoId: string) {
+    return this.estado.proveedores.flatMap((p) => p.resenas.filter((r) => r.pedidoId === pedidoId).map((r) => ({ ...r, proveedorId: p.id })));
   }
-  async resenar(pedidoId: string, datos: DatosResena) {
+  async resenar(pedidoId: string, proveedorId: string, datos: DatosResena) {
     validarResena(datos);
     const pedido = this.estado.pedidos.find((x) => x.id === pedidoId);
-    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicadaA) throw new Error('Solo se reseña un pedido adjudicado.');
-    if (await this.resenaDePedido(pedidoId)) throw new Error('Ya dejaste la reseña de este pedido.');
-    const prov = this.estado.proveedores.find((x) => x.id === pedido.adjudicadaA)!;
+    if (!pedido || pedido.estado !== 'adjudicado' || !pedido.adjudicados?.includes(proveedorId)) throw new Error('Solo se reseña a un proveedor que ganó el pedido.');
+    if ((await this.resenasDePedido(pedidoId)).some((r) => r.proveedorId === proveedorId)) throw new Error('Ya dejaste la reseña de este proveedor.');
+    const prov = this.proveedor(proveedorId);
     const comp = this.estado.compradores.find((x) => x.id === pedido.compradorId);
     prov.resenas.unshift({
-      ...datos, texto: datos.texto.trim(), pedidoId, fecha: hoy(),
+      ...datos, texto: datos.texto.trim(), pedidoId, proveedorId, fecha: hoy(),
       autor: comp ? `${comp.nombre} ${comp.apellido}` : 'Comprador', empresa: comp?.empresa ?? '',
     });
     this.guardar();
@@ -286,7 +288,7 @@ export class MockRepository implements Repository {
   async embudo(proveedorId: string) {
     const enviadas = this.estado.solicitudes.filter((s) => s.proveedorId === proveedorId);
     const aceptadas = enviadas.filter((s) => s.estado === 'aceptada').length;
-    const ganadas = this.estado.pedidos.filter((p) => p.adjudicadaA === proveedorId).length;
+    const ganadas = this.estado.pedidos.filter((p) => p.adjudicados?.includes(proveedorId)).length;
     // Base histórica ficticia para que el tablero de la demo tenga volumen.
     return { vistas: 342, solicitudes: 14 + enviadas.length, aceptadas: 8 + aceptadas, reuniones: 5 + aceptadas, ganadas: 2 + ganadas };
   }

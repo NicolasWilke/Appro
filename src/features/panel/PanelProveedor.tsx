@@ -1,3 +1,4 @@
+import { recibeOfertas } from '@/domain/rfq';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSesion } from '@/app/session';
@@ -26,7 +27,7 @@ export function PanelProveedor() {
   const { data } = useQuery(async (r) => {
     const yo = (await r.obtenerPersona(usuarioId)) as Proveedor;
     const [uso, embudo, enviadas, compradores, pedidos] = await Promise.all([
-      r.uso(usuarioId), r.embudo(usuarioId), r.solicitudesEnviadas(usuarioId), r.listarCompradores(), r.listarPedidos({ rubros: yo.rubros }),
+      r.uso(usuarioId), r.embudo(usuarioId), r.solicitudesEnviadas(usuarioId), r.listarCompradores(), r.listarPedidos({ rubros: yo.rubros, visorId: usuarioId }),
     ]);
     return { yo, uso, embudo, enviadas, compradores, pedidos };
   }, [usuarioId]);
@@ -93,7 +94,7 @@ export function PanelProveedor() {
             </div>
           </Seccion>
           <Seccion titulo="Pedidos de cotización de tus rubros" extra={<Link to="/cotizaciones" className="enlace">Ver todos</Link>}>
-            {pedidos.filter((p) => p.estado === 'abierto').map((p) => (
+            {pedidos.filter((p) => recibeOfertas(p)).map((p) => (
               <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
                 <span className="mono tenue">{p.id}</span>
                 <span>{p.titulo}</span>
