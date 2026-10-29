@@ -4,7 +4,8 @@ import type { PlanId, SolicitudContacto, Uso } from './types';
 export const MOTIVO_MIN = 40;
 export const MOTIVO_MAX = 300;
 
-export type CodigoRegla = 'MOTIVO_CORTO' | 'MOTIVO_LARGO' | 'CUPO_SOLICITUDES' | 'CUPO_RESPUESTAS' | 'SOLICITUD_DUPLICADA' | 'NO_RECIBE' | 'PEDIDO_CERRADO' | 'YA_COTIZO' | 'RESENA_INVALIDA' | 'VALOR_INVALIDO';
+export type CodigoRegla = 'MOTIVO_CORTO' | 'MOTIVO_LARGO' | 'CUPO_SOLICITUDES' | 'CUPO_RESPUESTAS' | 'SOLICITUD_DUPLICADA' | 'NO_RECIBE' | 'PEDIDO_CERRADO' | 'YA_COTIZO' | 'RESENA_INVALIDA' | 'VALOR_INVALIDO'
+  | 'PEDIDO_INVALIDO' | 'COTIZACION_INVALIDA' | 'ADJUDICACION_INVALIDA' | 'NO_INVITADO';
 
 export class ReglaDeNegocioError extends Error {
   constructor(public codigo: CodigoRegla, mensaje: string) {
@@ -40,7 +41,7 @@ export function validarSolicitud(args: {
 }
 
 export function validarRespuestaPedido(args: { plan: PlanId; uso: Uso; pedidoAbierto: boolean; yaCotizo: boolean }) {
-  if (!args.pedidoAbierto) throw new ReglaDeNegocioError('PEDIDO_CERRADO', 'Este pedido ya se adjudicó.');
+  if (!args.pedidoAbierto) throw new ReglaDeNegocioError('PEDIDO_CERRADO', 'Este pedido ya no recibe cotizaciones.');
   if (args.yaCotizo) throw new ReglaDeNegocioError('YA_COTIZO', 'Ya mandaste una cotización para este pedido.');
   if (cupoRestante(args.plan, args.uso).respuestas === 0)
     throw new ReglaDeNegocioError('CUPO_RESPUESTAS', 'El plan Gratis incluye 3 respuestas por mes y ya las usaste.');

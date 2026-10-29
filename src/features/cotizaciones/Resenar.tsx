@@ -20,8 +20,8 @@ function Puntaje({ etiqueta, valor, onCambio }: { etiqueta: string; valor: numbe
   );
 }
 
-/** El comprador califica al proveedor que ganó su pedido. Una reseña por pedido, sin edición posterior. */
-export function Resenar({ pedidoId, empresa, resena }: { pedidoId: string; empresa: string; resena: Resena | null }) {
+/** El comprador califica a cada proveedor que ganó su pedido. Una reseña por proveedor, sin edición posterior. */
+export function Resenar({ pedidoId, proveedorId, empresa, resena }: { pedidoId: string; proveedorId: string; empresa: string; resena: Resena | null }) {
   const repo = useRepo();
   const avisar = useToast();
   const [d, setD] = useState<DatosResena>({ entrega: 0, calidad: 0, facturacion: 0, texto: '' });
@@ -44,7 +44,7 @@ export function Resenar({ pedidoId, empresa, resena }: { pedidoId: string; empre
     setError('');
     setEnviando(true);
     try {
-      await repo.resenar(pedidoId, d);
+      await repo.resenar(pedidoId, proveedorId, d);
       avisar(`Gracias. Tu reseña ya aparece en el perfil de ${empresa.replace(/\.$/, '')}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar la reseña.');
@@ -55,7 +55,7 @@ export function Resenar({ pedidoId, empresa, resena }: { pedidoId: string; empre
 
   return (
     <Seccion titulo={`Calificá a ${empresa}`}>
-      <p className="tenue">Se publica en su perfil con tu nombre y empresa. Es una sola por pedido y no se puede editar.</p>
+      <p className="tenue">Se publica en su perfil con tu nombre y empresa. Es una sola por pedido y proveedor, y no se puede editar.</p>
       <div className="puntajes">
         {CRITERIOS.map(([k, txt]) => <Puntaje key={k} etiqueta={txt} valor={d[k]} onCambio={(n) => setD({ ...d, [k]: n })} />)}
       </div>

@@ -463,3 +463,87 @@ textarea { resize: vertical; line-height: 1.5; }
 .campo--chico { min-width: 5.5rem; margin: 0; }
 .campo--chico > span { font-size: var(--t-xs, 0.75rem); }
 .campo--chico input { width: 100%; }
+
+/* ── Pedido de cotización completo (RFQ) */
+.pedido-form .seccion { gap: 1rem; }
+.items-editor { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.85rem; counter-reset: none; }
+.items-editor__fila { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(5.5rem, 0.8fr) minmax(6rem, 1fr) auto; gap: 0.6rem 0.75rem; align-items: end; padding-bottom: 0.85rem; border-bottom: 1px solid var(--linea); }
+.items-editor__fila:last-child { border-bottom: 0; padding-bottom: 0; }
+.items-editor__desc { grid-column: 1 / 4; }
+.items-editor__quitar { align-self: center; grid-row: 1; grid-column: 4; }
+@media (max-width: 640px) {
+  .items-editor__fila { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .items-editor__fila > .campo:first-child, .items-editor__desc { grid-column: 1 / -1; }
+  .items-editor__quitar { grid-row: auto; grid-column: 1 / -1; justify-self: start; }
+}
+.opciones-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 0.75rem; }
+.opciones-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0.5rem; }
+.invitados { display: grid; gap: 0.6rem; }
+.invitados__cab { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: var(--t-s); }
+.invitados__lista { display: grid; gap: 0.4rem; max-height: 18rem; overflow-y: auto; padding-right: 0.25rem; }
+.enlaces { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: var(--t-s); }
+.enlaces li { display: flex; gap: 0.75rem; align-items: baseline; min-width: 0; }
+.enlaces a { color: var(--sello); overflow-wrap: anywhere; }
+.enlaces__nuevo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 0.5rem; align-items: center; }
+@media (max-width: 560px) { .enlaces__nuevo { grid-template-columns: minmax(0, 1fr); } .enlaces__nuevo .btn { justify-self: start; } }
+.entrada-num { width: 8.5rem; text-align: right; }
+.entrada-num--chica { width: 4.5rem; }
+.tabla--cotizar { min-width: 680px; }
+.tabla--cotizar td { vertical-align: middle; }
+.tabla tfoot td, .tabla tfoot th { padding: 0.55rem 0.9rem; border-top: 1px solid var(--linea); background: var(--superficie-2); font-size: var(--t-s); text-align: left; font-weight: 500; }
+.tabla tfoot .num { text-align: right; }
+.tabla .tabla__total td, .tabla .tabla__total th { font-weight: 700; color: var(--tinta); }
+.tabla tbody th, .tabla tfoot th { text-align: left; font: 400 var(--t-s)/1.4 var(--f-texto); text-transform: none; letter-spacing: 0; color: var(--tinta); white-space: normal; padding: 0.8rem 0.9rem; border-bottom: 1px solid var(--linea); vertical-align: top; background: var(--superficie); }
+.tabla tfoot th { background: var(--superficie-2); padding: 0.55rem 0.9rem; border-bottom: 0; border-top: 1px solid var(--linea); }
+.tabla--matriz { min-width: 0; }
+.tabla--matriz thead th.matriz__prov { white-space: normal; text-transform: none; letter-spacing: 0; font: 600 var(--t-s)/1.3 var(--f-texto); min-width: 11rem; text-align: right; }
+.matriz__etqs { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; margin-top: 0.3rem; }
+.matriz__celda { display: inline-flex; gap: 0.5rem; align-items: flex-start; justify-content: flex-end; cursor: pointer; }
+.matriz__celda input { accent-color: var(--sello); margin-top: 0.2rem; }
+.tabla td.is-mejor { background: var(--ok-suave); }
+.tabla td.is-elegida { box-shadow: inset 0 0 0 2px var(--sello); }
+.matriz__notas { font-size: var(--t-xs); min-width: 11rem; text-align: left; }
+.pedido__desc { max-width: 760px; margin: 0; }
+.pedido__docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1rem; font-size: var(--t-s); }
+.pedido__docs ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+.sobre { display: grid; gap: 0.35rem; padding: 1rem 1.15rem; border: 1px dashed var(--linea); border-radius: var(--r-m); background: var(--superficie-2); }
+.sobre__tit { margin: 0; font-weight: 700; }
+.adjudicacion { display: grid; gap: 0.4rem; font-size: var(--t-s); }
+.adjudicacion p { margin: 0; }
+.adjudicar { display: grid; gap: 0.75rem; border-top: 1px solid var(--linea); padding-top: 0.85rem; }
+.adjudicar__atajos { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.adjudicar p { margin: 0; }
+
+/* ── Resumen ejecutivo: pensado para imprimirse en A4 */
+.resumen__barra { display: grid; gap: 0.5rem; }
+.resumen__acciones { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.resumen__ayuda { margin: 0; font-size: var(--t-xs); }
+.hoja { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-m); padding: clamp(1rem, 4vw, 2.5rem); display: grid; gap: 1.5rem; max-width: 1000px; }
+.hoja__cab { display: flex; justify-content: space-between; gap: 1rem; align-items: start; border-bottom: 3px solid var(--sello); padding-bottom: 1rem; }
+.hoja__cab h1 { margin: 0.2rem 0; font-size: 1.6rem; }
+.hoja__id { font-size: 1.1rem; margin: 0; white-space: nowrap; }
+.hoja__sec { display: grid; gap: 0.75rem; }
+.hoja__sec h2 { font-size: var(--t-m); margin: 0; }
+.hoja__datos { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 0.6rem 1.25rem; font-size: var(--t-s); }
+.hoja__datos dt { font: 500 var(--t-xs)/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--tenue); }
+.hoja__datos dd { margin: 0.15rem 0 0; }
+.hoja__ganador { padding: 0.75rem 0.9rem; border: 1px solid var(--linea); border-radius: var(--r-s); }
+.hoja__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.75rem; }
+.hoja__tabla { width: 100%; border-collapse: collapse; font-size: var(--t-s); }
+.hoja__tabla th, .hoja__tabla td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--linea); text-align: left; }
+.hoja__tabla th { font: 600 var(--t-xs)/1.2 var(--f-texto); color: var(--tenue); }
+.hoja__tabla .num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.hoja__tabla td.is-mejor { background: var(--ok-suave); font-weight: 700; }
+.hoja__tabla td.is-elegida { box-shadow: inset 0 0 0 2px var(--sello); }
+.hoja__total td { font-weight: 700; }
+.hoja__nota, .hoja__pie { font-size: var(--t-xs); color: var(--tenue); margin: 0; }
+.hoja__comentario p { margin: 0.25rem 0 0; }
+.resumen .hoja { overflow-x: auto; }
+@media print {
+  .cabecera, .aviso-demo, .pie, .no-imprimir, .toast { display: none !important; }
+  body { background: #fff; }
+  .pagina { padding: 0; }
+  .hoja { border: 0; padding: 0; max-width: none; overflow: visible; }
+  .hoja__sec { break-inside: avoid; }
+  .hoja__tabla td.is-mejor { background: #e3f4e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

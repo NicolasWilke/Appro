@@ -1,3 +1,4 @@
+import { cierreIso } from '@/domain/rfq';
 import type { Comprador, Cotizacion, PedidoCotizacion, Proveedor, SerieIndice, SolicitudContacto, Uso } from '@/domain/types';
 
 // Personas y empresas ficticias. Cualquier parecido es coincidencia.
@@ -192,29 +193,64 @@ export const solicitudes: SolicitudContacto[] = [
     motivo: 'Film stretch y embalaje para piezas metálicas, con entrega semanal en Córdoba.' },
 ];
 
+type PedidoSimple = Pick<PedidoCotizacion, 'id' | 'compradorId' | 'titulo' | 'rubro' | 'cantidad' | 'unidad' | 'entrega' | 'pago' | 'zona' | 'cierre' | 'estado'>;
+/** Pedido de un solo ítem, como los que se publicaban antes de la RFQ completa. */
+const simple = (p: PedidoSimple, extra: Partial<PedidoCotizacion> = {}): PedidoCotizacion => ({
+  descripcion: '', items: [{ id: 'i1', nombre: p.titulo, descripcion: '', cantidad: p.cantidad, unidad: p.unidad }],
+  cierraEn: cierreIso(p.cierre), privado: false, invitados: [], sobreCerrado: false, documentos: [], adjuntos: [], ofertas: 0, ...p, ...extra,
+});
+
 export const pedidos: PedidoCotizacion[] = [
-  { id: 'PC-2611', compradorId: 'laura-gimenez', titulo: 'Film laminado BOPP/PE impreso para galletitas', rubro: 'packaging',
+  simple({ id: 'PC-2611', compradorId: 'laura-gimenez', titulo: 'Film laminado BOPP/PE impreso para galletitas', rubro: 'packaging',
     cantidad: 12000, unidad: 'kg', entrega: 'En planta Rosario, 30 días', pago: '60 días fecha factura', zona: 'Rosario', cierre: '2026-11-08', estado: 'abierto' },
-  { id: 'PC-2607', compradorId: 'laura-gimenez', titulo: 'Cámara de frío −18 °C, 40 posiciones pallet', rubro: 'frio',
-    cantidad: 40, unidad: 'posiciones pallet/mes', entrega: 'Desde el 1/12, contrato de 6 meses', pago: '30 días fecha factura', zona: 'Gran Rosario', cierre: '2026-11-04', estado: 'abierto' },
-  { id: 'PC-2598', compradorId: 'martin-ferreyra', titulo: 'Mantenimiento preventivo de 6 prensas hidráulicas', rubro: 'mantenimiento',
-    cantidad: 480, unidad: 'horas técnico', entrega: 'Contrato anual, visitas quincenales', pago: '30 días fecha factura', zona: 'Córdoba', cierre: '2026-11-15', estado: 'abierto' },
-  { id: 'PC-2615', compradorId: 'sofia-benitez', titulo: 'Etiquetas autoadhesivas 10×5 cm con Datamatrix', rubro: 'etiquetas',
-    cantidad: 600, unidad: 'millares', entrega: 'Entregas mensuales en CABA', pago: '60 días fecha factura', zona: 'AMBA', cierre: '2026-11-20', estado: 'abierto' },
-  { id: 'PC-2619', compradorId: 'carolina-ruiz', titulo: 'Bolsas stand-up con zipper para marca propia', rubro: 'packaging',
-    cantidad: 3500, unidad: 'kg', entrega: 'Mar del Plata, 20 días', pago: '30 días fecha factura', zona: 'Costa Atlántica', cierre: '2026-11-12', estado: 'abierto' },
-  { id: 'PC-2617', compradorId: 'carolina-ruiz', titulo: 'Vigilancia 24 h para centro de distribución, 1 puesto', rubro: 'seguridad',
-    cantidad: 744, unidad: 'horas vigilador', entrega: 'Mensual, desde el 1/12, contrato de 12 meses', pago: '30 días fecha factura', zona: 'Mar del Plata', cierre: '2026-11-18', estado: 'abierto' },
+  { sobreCerrado: true, documentos: ['Ficha técnica del producto'] }),
+  simple({ id: 'PC-2607', compradorId: 'laura-gimenez', titulo: 'Cámara de frío −18 °C, 40 posiciones pallet', rubro: 'frio',
+    cantidad: 40, unidad: 'posiciones pallet/mes', entrega: 'Desde el 1/12, contrato de 6 meses', pago: '30 días fecha factura', zona: 'Gran Rosario', cierre: '2026-11-04', estado: 'abierto' }),
+  simple({ id: 'PC-2598', compradorId: 'martin-ferreyra', titulo: 'Mantenimiento preventivo de 6 prensas hidráulicas', rubro: 'mantenimiento',
+    cantidad: 480, unidad: 'horas técnico', entrega: 'Contrato anual, visitas quincenales', pago: '30 días fecha factura', zona: 'Córdoba', cierre: '2026-11-15', estado: 'abierto' }),
+  simple({ id: 'PC-2615', compradorId: 'sofia-benitez', titulo: 'Etiquetas autoadhesivas 10×5 cm con Datamatrix', rubro: 'etiquetas',
+    cantidad: 600, unidad: 'millares', entrega: 'Entregas mensuales en CABA', pago: '60 días fecha factura', zona: 'AMBA', cierre: '2026-11-20', estado: 'abierto' }),
+  simple({ id: 'PC-2619', compradorId: 'carolina-ruiz', titulo: 'Bolsas stand-up con zipper para marca propia', rubro: 'packaging',
+    cantidad: 3500, unidad: 'kg', entrega: 'Mar del Plata, 20 días', pago: '30 días fecha factura', zona: 'Costa Atlántica', cierre: '2026-11-12', estado: 'abierto' }),
+  simple({ id: 'PC-2617', compradorId: 'carolina-ruiz', titulo: 'Vigilancia 24 h para centro de distribución, 1 puesto', rubro: 'seguridad',
+    cantidad: 744, unidad: 'horas vigilador', entrega: 'Mensual, desde el 1/12, contrato de 12 meses', pago: '30 días fecha factura', zona: 'Mar del Plata', cierre: '2026-11-18', estado: 'abierto' }),
+  {
+    id: 'PC-2621', compradorId: 'laura-gimenez', titulo: 'Insumos de empaque para la línea 2', rubro: 'packaging',
+    descripcion: 'Reposición trimestral para la línea de galletitas dulces. Se acepta cotizar con entregas parciales.',
+    items: [
+      { id: 'i1', nombre: 'Film BOPP/PE laminado impreso', descripcion: 'Bobinas de 320 mm, 4 colores, mandril de 3"', cantidad: 4000, unidad: 'kg' },
+      { id: 'i2', nombre: 'Cajas de cartón corrugado', descripcion: 'Onda B, 40×30×25 cm, impresión 1 color', cantidad: 12000, unidad: 'unidades' },
+      { id: 'i3', nombre: 'Cinta de embalar transparente', descripcion: '48 mm × 100 m', cantidad: 600, unidad: 'rollos' },
+    ],
+    cantidad: 4000, unidad: 'kg', entrega: 'En planta Rosario, entregas parciales en 20 días', pago: '60 días fecha factura', zona: 'Rosario',
+    cierre: '2026-10-27', cierraEn: cierreIso('2026-10-27'), privado: true, invitados: ['ramiro-ortiz', 'gustavo-lopez', 'lucia-romero'], sobreCerrado: true,
+    documentos: ['Constancia de inscripción en ARCA', 'Ficha técnica del producto'],
+    adjuntos: [{ nombre: 'Arte de impresión del film', url: 'https://drive.google.com/file/d/ejemplo-arte-film' }],
+    ofertas: 0, estado: 'abierto',
+  },
 ];
 
+type OfertaSimple = Pick<Cotizacion, 'id' | 'pedidoId' | 'proveedorId' | 'precioUnitario' | 'plazoDias' | 'pago' | 'nota' | 'creada'>;
+const oferta = (c: OfertaSimple): Cotizacion => ({
+  ...c, items: [{ itemId: 'i1', precioUnitario: c.precioUnitario, descuento: 0, iva: 21 }], vigencia: '2026-11-30', adjuntos: [],
+});
+const it = (itemId: string, precioUnitario: number, descuento = 0, iva = 21) => ({ itemId, precioUnitario, descuento, iva });
+
 export const cotizaciones: Cotizacion[] = [
-  { id: 'c-1', pedidoId: 'PC-2611', proveedorId: 'gustavo-lopez', precioUnitario: 6420, plazoDias: 28, pago: '30 días fecha factura', nota: 'Requiere 50% de anticipo en la primera orden.', creada: '2026-10-21' },
-  { id: 'c-2', pedidoId: 'PC-2611', proveedorId: 'ramiro-ortiz', precioUnitario: 6850, plazoDias: 21, pago: '60 días fecha factura', nota: 'Incluye cilindros de impresión.', creada: '2026-10-22' },
-  { id: 'c-3', pedidoId: 'PC-2607', proveedorId: 'valeria-mendez', precioUnitario: 40200, plazoDias: 7, pago: '30 días fecha factura', nota: 'Monitoreo de temperatura incluido.', creada: '2026-10-23' },
-  { id: 'c-4', pedidoId: 'PC-2607', proveedorId: 'pablo-aguirre', precioUnitario: 45800, plazoDias: 10, pago: '30 días fecha factura', nota: 'Cámara en Pérez, a confirmar disponibilidad.', creada: '2026-10-23' },
-  { id: 'c-5', pedidoId: 'PC-2598', proveedorId: 'javier-sosa', precioUnitario: 27100, plazoDias: 15, pago: '30 días fecha factura', nota: 'Incluye informe mensual de vibraciones.', creada: '2026-10-20' },
-  { id: 'c-7', pedidoId: 'PC-2617', proveedorId: 'mariela-funes', precioUnitario: 15900, plazoDias: 10, pago: '30 días fecha factura', nota: 'Incluye supervisor móvil y rondas con registro digital.', creada: '2026-10-23' },
-  { id: 'c-6', pedidoId: 'PC-2615', proveedorId: 'lucia-romero', precioUnitario: 19800, plazoDias: 12, pago: '60 días fecha factura', nota: '', creada: '2026-10-22' },
+  oferta({ id: 'c-1', pedidoId: 'PC-2611', proveedorId: 'gustavo-lopez', precioUnitario: 6420, plazoDias: 28, pago: '30 días fecha factura', nota: 'Requiere 50% de anticipo en la primera orden.', creada: '2026-10-21' }),
+  oferta({ id: 'c-2', pedidoId: 'PC-2611', proveedorId: 'ramiro-ortiz', precioUnitario: 6850, plazoDias: 21, pago: '60 días fecha factura', nota: 'Incluye cilindros de impresión.', creada: '2026-10-22' }),
+  oferta({ id: 'c-3', pedidoId: 'PC-2607', proveedorId: 'valeria-mendez', precioUnitario: 40200, plazoDias: 7, pago: '30 días fecha factura', nota: 'Monitoreo de temperatura incluido.', creada: '2026-10-23' }),
+  oferta({ id: 'c-4', pedidoId: 'PC-2607', proveedorId: 'pablo-aguirre', precioUnitario: 45800, plazoDias: 10, pago: '30 días fecha factura', nota: 'Cámara en Pérez, a confirmar disponibilidad.', creada: '2026-10-23' }),
+  oferta({ id: 'c-5', pedidoId: 'PC-2598', proveedorId: 'javier-sosa', precioUnitario: 27100, plazoDias: 15, pago: '30 días fecha factura', nota: 'Incluye informe mensual de vibraciones.', creada: '2026-10-20' }),
+  oferta({ id: 'c-7', pedidoId: 'PC-2617', proveedorId: 'mariela-funes', precioUnitario: 15900, plazoDias: 10, pago: '30 días fecha factura', nota: 'Incluye supervisor móvil y rondas con registro digital.', creada: '2026-10-23' }),
+  oferta({ id: 'c-6', pedidoId: 'PC-2615', proveedorId: 'lucia-romero', precioUnitario: 19800, plazoDias: 12, pago: '60 días fecha factura', nota: '', creada: '2026-10-22' }),
+  { id: 'c-8', pedidoId: 'PC-2621', proveedorId: 'ramiro-ortiz', items: [it('i1', 6700, 5), it('i2', 1150), it('i3', 2900)], precioUnitario: 6365,
+    plazoDias: 18, vigencia: '2026-11-20', pago: '60 días fecha factura', nota: 'Film y cajas en la misma entrega.',
+    adjuntos: [{ nombre: 'Cotización formal', url: 'https://drive.google.com/file/d/ejemplo-ortiz' }], creada: '2026-10-24' },
+  { id: 'c-9', pedidoId: 'PC-2621', proveedorId: 'gustavo-lopez', items: [it('i1', 6420), it('i2', 1320), it('i3', 2600, 10)], precioUnitario: 6420,
+    plazoDias: 25, vigencia: '2026-11-15', pago: '30 días fecha factura', nota: 'Cinta de marca propia, misma calidad que 3M.', adjuntos: [], creada: '2026-10-25' },
+  { id: 'c-10', pedidoId: 'PC-2621', proveedorId: 'lucia-romero', items: [it('i1', 7100), it('i2', 1090), it('i3', 3100)], precioUnitario: 7100,
+    plazoDias: 12, vigencia: '2026-11-30', pago: '60 días fecha factura', nota: '', adjuntos: [], creada: '2026-10-26' },
 ];
 
 export const usos: Record<string, Uso> = {
