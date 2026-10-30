@@ -411,3 +411,21 @@ describe('compras recientes y pedidos de valor', () => {
     await assertFails(getDocs(query(collection(como('comp1'), 'solicitudesValor'), where('compradorId', '==', 'comp2'))));
   });
 });
+
+describe('centro de referencias', () => {
+  const indicador = (cambios: Record<string, unknown> = {}) => ({
+    nombre: 'IPC', grupo: 'precios', organismo: 'INDEC', unidad: 'puntos', fuente: { nombre: 'INDEC', url: 'https://www.indec.gob.ar' }, serie: [{ periodo: '2026-10', valor: 12739.4 }], actualizado: '2026-11-12', ...cambios,
+  });
+  it('lo leen los compradores; lo carga solo un admin', async () => {
+    await sembrar('indicadores/ipc', indicador());
+    await assertSucceeds(getDoc(doc(como('comp1'), 'indicadores', 'ipc')));
+    await assertFails(getDoc(doc(como('prov1'), 'indicadores', 'ipc')));
+    await assertFails(setDoc(doc(como('comp1'), 'indicadores', 'ipc'), indicador()));
+    await sembrar('admins/prov3', {});
+    await assertSucceeds(setDoc(doc(como('prov3'), 'indicadores', 'ipc'), indicador()));
+    await assertSucceeds(getDoc(doc(como('prov3'), 'indicadores', 'ipc')));
+    await assertFails(setDoc(doc(como('prov3'), 'indicadores', 'ipc'), indicador({ grupo: 'otro' })));
+    await assertFails(setDoc(doc(como('prov3'), 'escalas', 'upsra'), { periodo: 'septiembre', categorias: [] }));
+    await assertSucceeds(setDoc(doc(como('prov3'), 'escalas', 'upsra'), { actividad: 'Vigilancia', convenio: 'CCT 507/07', periodo: '2026-10', fuente: { nombre: 'UPSRA', url: '' }, categorias: [], actualizado: '2026-11-01' }));
+  });
+});

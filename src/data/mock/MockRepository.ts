@@ -2,7 +2,7 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Antecedente, Comprador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { antecedentesDe, antiguedad, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
@@ -10,6 +10,7 @@ import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
 import * as seed from './seed';
 import { textoBuscable } from '@/domain/directorio';
+import { escalasBase, indicadoresBase } from '../indicadores-base';
 
 interface Estado {
   compradores: Comprador[];
@@ -23,6 +24,8 @@ interface Estado {
   colaResumen: Record<string, string[]>;
   /** Valores de referencia editados desde el panel de administración, por id */
   valores?: Record<string, ValorReferencia>;
+  indicadores?: Record<string, Indicador>;
+  escalas?: Record<string, EscalaConvenio>;
   consultas?: Consulta[];
   favoritos?: Record<string, string[]>;
   antecedentes?: Antecedente[];
@@ -330,6 +333,20 @@ export class MockRepository implements Repository {
   async guardarValor(v: ValorReferencia) {
     validarValor(v);
     (this.estado.valores ??= {})[v.id] = clonar(v);
+    this.guardar();
+  }
+  async indicadores() {
+    return {
+      indicadores: indicadoresBase.map((i) => clonar(this.estado.indicadores?.[i.id] ?? i)),
+      escalas: escalasBase.map((e) => clonar(this.estado.escalas?.[e.id] ?? e)),
+    };
+  }
+  async guardarIndicador(i: Indicador) {
+    (this.estado.indicadores ??= {})[i.id] = clonar({ ...i, actualizado: hoy() });
+    this.guardar();
+  }
+  async guardarEscala(e: EscalaConvenio) {
+    (this.estado.escalas ??= {})[e.id] = clonar({ ...e, actualizado: hoy() });
     this.guardar();
   }
   /** En la demo cualquiera puede probar el panel de administración. */

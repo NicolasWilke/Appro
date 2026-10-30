@@ -5,7 +5,7 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Antecedente, Comprador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
+  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { textoBuscable } from '@/domain/directorio';
@@ -13,6 +13,9 @@ import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudVa
 import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
 import { valores as valoresBase } from '../valores-referencia';
+import { escalasBase, indicadoresBase } from '../indicadores-base';
+/** Firestore no acepta undefined: se quitan los campos opcionales vacíos, también dentro de listas. */
+const sinIndefinidos = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 import type { NuevaCotizacion, NuevoPedido, Repository } from '../repository';
 
 /**
@@ -309,6 +312,24 @@ export class FirestoreRepository implements Repository {
     // Firestore no acepta undefined: se omiten los campos opcionales vacíos.
     const limpio = Object.fromEntries(Object.entries(datos).filter(([, x]) => x !== undefined));
     await setDoc(doc(this.db, 'valoresReferencia', id), { ...limpio, actualizado: serverTimestamp(), actualizadoPor: this.yo() });
+    this.tocar(undefined);
+  }
+  async indicadores() {
+    const [ind, esc] = await Promise.all([getDocs(collection(this.db, 'indicadores')), getDocs(collection(this.db, 'escalas'))]);
+    const pisar = <T extends { id: string }>(base: T[], docs: typeof ind.docs) => {
+      const guardados = new Map(docs.map((d) => [d.id, { ...(d.data() as T), id: d.id }]));
+      return [...base.map((b) => guardados.get(b.id) ?? b), ...[...guardados.values()].filter((g) => !base.some((b) => b.id === g.id))];
+    };
+    return { indicadores: pisar(indicadoresBase, ind.docs), escalas: pisar(escalasBase, esc.docs) };
+  }
+  async guardarIndicador(i: Indicador) {
+    const { id, ...datos } = i;
+    await setDoc(doc(this.db, 'indicadores', id), sinIndefinidos({ ...datos, actualizado: hoyIso() }));
+    this.tocar(undefined);
+  }
+  async guardarEscala(e: EscalaConvenio) {
+    const { id, ...datos } = e;
+    await setDoc(doc(this.db, 'escalas', id), sinIndefinidos({ ...datos, actualizado: hoyIso() }));
     this.tocar(undefined);
   }
   async esAdmin(uid: string) {

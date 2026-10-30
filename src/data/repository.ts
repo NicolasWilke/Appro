@@ -1,5 +1,5 @@
 import type {
-  Antecedente, Comprador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
+  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
   Persona, PlanId, Proveedor, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
@@ -74,6 +74,10 @@ export interface Repository {
   valoresReferencia(): Promise<{ valores: ValorReferencia[]; mesesIso: string[]; inflacion: number[] }>;
   /** Solo administradores: cambia un valor de referencia. */
   guardarValor(valor: ValorReferencia): Promise<void>;
+  /** Centro de referencias: índices oficiales y escalas de convenio. Lo cargado por un admin pisa los datos de partida. */
+  indicadores(): Promise<{ indicadores: Indicador[]; escalas: EscalaConvenio[] }>;
+  guardarIndicador(i: Indicador): Promise<void>;
+  guardarEscala(e: EscalaConvenio): Promise<void>;
   /** Si la cuenta puede editar los valores de referencia. */
   esAdmin(uid: string): Promise<boolean>;
 

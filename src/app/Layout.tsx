@@ -14,6 +14,7 @@ const NAV: { a: string; texto: string; fin?: boolean; rol?: Rol }[] = [
   { a: '/cotizaciones', texto: t.nav.cotizaciones },
   { a: '/valores', texto: t.nav.valores },
   { a: '/compras-recientes', texto: t.nav.recientes, rol: 'comprador' },
+  { a: '/referencias', texto: t.nav.referencias, rol: 'comprador' },
   { a: '/precios', texto: t.nav.precios },
   { a: '/planes', texto: t.nav.planes },
 ];

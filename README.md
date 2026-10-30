@@ -181,6 +181,8 @@ Los pedidos creados antes de esta versión no tienen los campos nuevos y, hasta 
 
 **Directorio:** búsqueda por nombre, empresa, ciudad, catálogo o certificación; filtros de región, rubro, calificación mínima y certificaciones; para compradores, "Mis listas" (favoritos, ya me cotizaron, les adjudiqué). Insignias automáticas (Verificado, Top Rated con 4,5 o más y 5 reseñas, Certificado); el Destacado pago se rotula como publicidad. El promedio pondera el doble las reseñas de los últimos 24 meses y se muestra desde 3 reseñas. Se pueden comparar hasta 4 proveedores lado a lado e invitar a varios a un pedido privado de una vez.
 
+**Índices y convenios** (`/referencias`, solo compradores): IPC, IPC-BA, IPIM, ICC y CAMARCO, más las escalas de vigilancia, limpieza, edificios y UOCRA con valor hora (mensual ÷ 200). Calcula variación mensual, acumulada del año e interanual componiendo (nunca sumando), actualiza montos entre dos meses, compara el aumento que pide un proveedor con la inflación y el convenio, proyecta con escenarios (usando primero los aumentos ya pactados) y simula cláusulas de ajuste ponderadas. Los datos de partida están en `src/data/indicadores-base.ts`; un admin carga datos nuevos en `/admin/indices` (`indicadores/{id}`, `escalas/{id}`), con validación de período, duplicados y saltos de más de 3 puntos. Los datos con más de 45 días sin cargar se marcan en rojo.
+
 ### Reseñas
 
 Cuando un comprador adjudica, en el pedido aparece **Calificá a…** por cada ganador: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. La reseña del ganador principal es `resenas/{pedidoId}` y la de los demás `resenas/{pedidoId}--{proveedor}`; no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para un proveedor que ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.
@@ -204,7 +206,7 @@ npm run test:reglas                      # prueba las reglas
 ### Dónde está
 
 - `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 67 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `tests/reglas/`: 68 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
 - `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
 - `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
 - `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
