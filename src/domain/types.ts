@@ -286,3 +286,40 @@ export interface ValorReferencia {
   /** yyyy-mm del relevamiento */
   fecha?: string;
 }
+
+export type GrupoIndicador = 'precios' | 'construccion' | 'salarios';
+/** Un mes de un indicador. `pactado`: aumento ya firmado en paritarias para un mes que todavía no llegó. */
+export interface PuntoSerie { periodo: string; valor: number; pactado?: boolean }
+/** Índice oficial (IPC, IPIM, ICC…) o evolución de una categoría de convenio. */
+export interface Indicador {
+  id: string;
+  nombre: string;
+  grupo: GrupoIndicador;
+  organismo: string;
+  /** 'puntos' para índices; 'mes' u 'hora' para montos en pesos */
+  unidad: 'puntos' | 'mes' | 'hora';
+  base?: string;
+  fuente: Enlace;
+  /** yyyy-mm-dd de la próxima publicación oficial */
+  proximaPublicacion?: string;
+  nota?: string;
+  /** Meses, del más viejo al más nuevo. Puede haber huecos. */
+  serie: PuntoSerie[];
+  /** yyyy-mm-dd de la última carga */
+  actualizado: string;
+}
+export interface CategoriaConvenio { nombre: string; basico: number | null; conformado: number | null; hora?: number | null }
+/** Escala vigente de un convenio colectivo, con sus categorías. */
+export interface EscalaConvenio {
+  id: string;
+  actividad: string;
+  convenio: string;
+  /** yyyy-mm de la escala */
+  periodo: string;
+  vigenciaHasta?: string;
+  proximaRevision?: string;
+  nota?: string;
+  fuente: Enlace;
+  categorias: CategoriaConvenio[];
+  actualizado: string;
+}
