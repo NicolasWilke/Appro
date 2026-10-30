@@ -1,5 +1,7 @@
 // Avisos por mail de pedidos nuevos, leyendo y escribiendo en Firestore.
-//   npm run avisos                 avisa los pedidos nuevos: mail inmediato o cola del resumen diario
+//   npm run avisos                 avisa los pedidos nuevos (mail inmediato o cola del resumen diario) y manda las
+//                                  alertas por hito: ofertas nuevas, cierre en 24 h, cierre, consultas respondidas,
+//                                  adjudicación y pedidos de valor (ver server/alertas.ts)
 //   npm run avisos -- --resumen    manda los resúmenes diarios pendientes (correrlo a las 8:00)
 //
 // El plan Spark de Firebase no tiene Cloud Functions, así que esto corre afuera:
@@ -11,6 +13,7 @@ import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notifica
 import type { Comprador, PedidoCotizacion, Proveedor } from '@/domain/types';
 import { crearMailSender } from './mail/MailSender';
 import { db } from './firebaseAdmin';
+import { mandarAlertas } from './alertas';
 
 const URL_PUBLICA = process.env.PUBLIC_URL ?? 'http://localhost:5173';
 const mail = crearMailSender();
@@ -53,7 +56,8 @@ async function avisarNuevos() {
       await db.doc(`colaResumen/${prov.id}`).set({ pedidos: FieldValue.arrayUnion(pedido.id) }, { merge: true });
       await d.ref.collection('avisos').doc(prov.id).set({ via: 'resumen', empresa: prov.empresa });
     }
-    await d.ref.update({ avisado: true });
+    // Desde acá las alertas por hito (server/alertas.ts) siguen este pedido hasta la adjudicación.
+    await d.ref.update({ avisado: true, adjudicacionAvisada: false });
     console.log(`${pedido.id}: ${enviados} mails, ${diarios.length} en el resumen diario.`);
   }
 }
@@ -81,4 +85,7 @@ async function mandarResumenes() {
 }
 
 if (process.argv.includes('--resumen')) await mandarResumenes();
-else await avisarNuevos();
+else {
+  await avisarNuevos();
+  await mandarAlertas(mail, URL_PUBLICA);
+}
