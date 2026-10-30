@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
-  addDoc, collection, collectionGroup, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc, where, writeBatch,
+  addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 setLogLevel('silent');
@@ -314,5 +314,47 @@ describe('reseñas', () => {
     await assertSucceeds(setDoc(doc(como('comp1'), 'resenas', 'PC-1--prov2'), resena({ proveedorId: 'prov2' })));
     await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1--prov3'), resena({ proveedorId: 'prov3' })));
     await assertFails(setDoc(doc(como('comp1'), 'resenas', 'PC-1'), resena({ proveedorId: 'prov2' })));
+  });
+});
+
+describe('consultas del pedido', () => {
+  const pregunta = (cambios: Record<string, unknown> = {}) => ({ pregunta: '¿Aceptan entregas parciales por semana?', respuesta: null, respondida: null, creada: serverTimestamp(), ...cambios });
+  it('pregunta un proveedor, sin autor, mientras el pedido recibe ofertas', async () => {
+    await assertSucceeds(addDoc(collection(como('prov1'), 'pedidos', 'PC-1', 'consultas'), pregunta()));
+    await assertFails(addDoc(collection(como('comp2'), 'pedidos', 'PC-1', 'consultas'), pregunta()));
+    await assertFails(addDoc(collection(como('prov1'), 'pedidos', 'PC-1', 'consultas'), pregunta({ autor: 'prov1' })));
+    await assertFails(addDoc(collection(como('prov1'), 'pedidos', 'PC-1', 'consultas'), pregunta({ pregunta: 'Corta' })));
+    await assertFails(addDoc(collection(como('prov1'), 'pedidos', 'PC-1', 'consultas'), pregunta({ respuesta: 'Me respondo solo' })));
+    await sembrar('pedidos/PC-C', { ...pedido('comp1', { cierraEn: enDias(-1) }), creado: new Date() });
+    await assertFails(addDoc(collection(como('prov1'), 'pedidos', 'PC-C', 'consultas'), pregunta()));
+  });
+  it('en un privado solo preguntan y leen los invitados', async () => {
+    await sembrar('pedidos/PC-P', { ...pedido('comp1', { privado: true, invitados: ['prov1'] }), creado: new Date() });
+    await assertSucceeds(addDoc(collection(como('prov1'), 'pedidos', 'PC-P', 'consultas'), pregunta()));
+    await assertFails(addDoc(collection(como('prov2'), 'pedidos', 'PC-P', 'consultas'), pregunta()));
+    await assertSucceeds(getDocs(collection(como('comp1'), 'pedidos', 'PC-P', 'consultas')));
+    await assertFails(getDocs(collection(como('prov2'), 'pedidos', 'PC-P', 'consultas')));
+  });
+  it('responde solo el comprador del pedido, una vez', async () => {
+    const ref = await addDoc(collection(como('prov1'), 'pedidos', 'PC-1', 'consultas'), pregunta());
+    const respuesta = { respuesta: 'Sí, hasta 3.000 kg por semana.', respondida: serverTimestamp() };
+    await assertFails(updateDoc(doc(como('prov1'), 'pedidos', 'PC-1', 'consultas', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('comp2'), 'pedidos', 'PC-1', 'consultas', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('comp1'), 'pedidos', 'PC-1', 'consultas', ref.id), { ...respuesta, pregunta: 'Otra pregunta distinta' }));
+    await assertSucceeds(updateDoc(doc(como('comp1'), 'pedidos', 'PC-1', 'consultas', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('comp1'), 'pedidos', 'PC-1', 'consultas', ref.id), { respuesta: 'Cambio de idea', respondida: serverTimestamp() }));
+    await assertSucceeds(getDocs(collection(como('prov2'), 'pedidos', 'PC-1', 'consultas')));
+  });
+});
+
+describe('favoritos', () => {
+  it('el comprador marca proveedores y solo él los ve', async () => {
+    await assertSucceeds(setDoc(doc(como('comp1'), 'users', 'comp1', 'favoritos', 'prov1'), { desde: serverTimestamp() }));
+    await assertFails(setDoc(doc(como('comp1'), 'users', 'comp1', 'favoritos', 'comp2'), { desde: serverTimestamp() }));
+    await assertFails(setDoc(doc(como('comp2'), 'users', 'comp1', 'favoritos', 'prov2'), { desde: serverTimestamp() }));
+    await assertFails(setDoc(doc(como('prov1'), 'users', 'prov1', 'favoritos', 'prov2'), { desde: serverTimestamp() }));
+    await assertSucceeds(getDocs(collection(como('comp1'), 'users', 'comp1', 'favoritos')));
+    await assertFails(getDocs(collection(como('prov1'), 'users', 'comp1', 'favoritos')));
+    await assertSucceeds(deleteDoc(doc(como('comp1'), 'users', 'comp1', 'favoritos', 'prov1')));
   });
 });

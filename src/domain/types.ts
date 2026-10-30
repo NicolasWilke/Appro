@@ -148,6 +148,19 @@ export interface Cotizacion {
   creada: string;
 }
 
+/**
+ * Pregunta de un proveedor sobre un pedido. La ven todos los que pueden ver el pedido, sin saber quién
+ * preguntó: por eso no se guarda el autor.
+ */
+export interface Consulta {
+  id: string;
+  pedidoId: string;
+  pregunta: string;
+  respuesta: string | null;
+  creada: string;
+  respondida: string | null;
+}
+
 export interface SerieIndice {
   rubro: RubroId;
   item: string;

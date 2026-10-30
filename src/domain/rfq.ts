@@ -134,7 +134,7 @@ export function ahorro(p: PedidoCotizacion, cotis: Cotizacion[], asignacion: Rec
 }
 
 // ── Validaciones
-const invalido = (codigo: 'PEDIDO_INVALIDO' | 'COTIZACION_INVALIDA' | 'ADJUDICACION_INVALIDA', msg: string) => new ReglaDeNegocioError(codigo, msg);
+const invalido = (codigo: 'PEDIDO_INVALIDO' | 'COTIZACION_INVALIDA' | 'ADJUDICACION_INVALIDA' | 'CONSULTA_INVALIDA', msg: string) => new ReglaDeNegocioError(codigo, msg);
 
 function validarEnlaces(enlaces: Enlace[], codigo: 'PEDIDO_INVALIDO' | 'COTIZACION_INVALIDA') {
   if (enlaces.length > ENLACES_MAX) throw invalido(codigo, `Podés sumar hasta ${ENLACES_MAX} enlaces.`);
@@ -205,4 +205,21 @@ export function itemsDe(d: { items?: ItemPedido[]; titulo: string; cantidad?: nu
 export function itemsCotizadosDe(d: { items?: ItemCotizado[]; precioUnitario?: number }, items: ItemPedido[]): ItemCotizado[] {
   if (d.items?.length) return d.items;
   return [{ itemId: items[0]?.id ?? 'i1', precioUnitario: d.precioUnitario ?? 0, descuento: 0, iva: 0 }];
+}
+
+// ── Consultas: se pregunta mientras el pedido recibe ofertas; responde solo el comprador, una vez.
+export const PREGUNTA_MIN = 10;
+export const PREGUNTA_MAX = 500;
+export const RESPUESTA_MAX = 1000;
+
+export function validarPregunta(p: PedidoCotizacion, proveedorId: string, pregunta: string, ahora = new Date()) {
+  if (!recibeOfertas(p, ahora)) throw new ReglaDeNegocioError('PEDIDO_CERRADO', 'El pedido ya cerró: no se pueden hacer más consultas.');
+  if (!puedeCotizar(p, proveedorId)) throw new ReglaDeNegocioError('NO_INVITADO', 'Este pedido es privado y no te invitaron.');
+  const t = pregunta.trim();
+  if (t.length < PREGUNTA_MIN || t.length > PREGUNTA_MAX) throw invalido('CONSULTA_INVALIDA', `La consulta tiene que tener entre ${PREGUNTA_MIN} y ${PREGUNTA_MAX} caracteres.`);
+}
+
+export function validarRespuestaConsulta(respuesta: string) {
+  const t = respuesta.trim();
+  if (!t || t.length > RESPUESTA_MAX) throw invalido('CONSULTA_INVALIDA', `La respuesta tiene que tener entre 1 y ${RESPUESTA_MAX} caracteres.`);
 }

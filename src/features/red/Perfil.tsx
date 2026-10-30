@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useContacto, useResponderSolicitud } from '@/auth/AuthProvider';
 import { REGION } from '@/config/region';
-import { useQuery } from '@/data/DataProvider';
+import { useQuery, useRepo } from '@/data/DataProvider';
 import { REGIONES, region } from '@/domain/catalogos';
 import { estadoVisibleParaProveedor, habilitaCanalDirecto } from '@/domain/reglas';
 import type { Comprador, Proveedor } from '@/domain/types';
@@ -101,6 +101,7 @@ function PerfilProveedor({ p }: { p: Proveedor }) {
               <h1>{p.empresa}</h1>
               <p>{p.nombre} {p.apellido} · {p.cargo}</p>
               <p className="tenue mono">{REGION.idFiscal.nombre} {p.idFiscal} · {p.ciudad}{p.empleados && ` · ${p.empleados} empleados`}</p>
+              {rol === 'comprador' && <BotonFavorito proveedorId={p.id} empresa={p.empresa} />}
             </div>
           </div>
           {p.certificaciones.length > 0 && <div className="chips">{p.certificaciones.map((x) => <Pill key={x} tono="sello">{x}</Pill>)}</div>}
@@ -162,5 +163,24 @@ function PerfilProveedor({ p }: { p: Proveedor }) {
         <p className="tenue">Región principal: {region(p.region).nombre}</p>
       </div>
     </div>
+  );
+}
+
+/** Marca al proveedor como favorito del comprador, para invitarlo rápido a pedidos privados. */
+function BotonFavorito({ proveedorId, empresa }: { proveedorId: string; empresa: string }) {
+  const { usuarioId } = useSesion();
+  const repo = useRepo();
+  const avisar = useToast();
+  const { data: favs } = useQuery((r) => r.favoritos(usuarioId), [usuarioId]);
+  if (!favs) return null;
+  const es = favs.includes(proveedorId);
+  const alternar = async () => {
+    await repo.marcarFavorito(usuarioId, proveedorId, !es);
+    avisar(es ? `${empresa} ya no está en tus favoritos.` : `${empresa} quedó en tus favoritos: lo vas a ver primero al invitar a un pedido privado.`);
+  };
+  return (
+    <button className={`btn btn--chico ${es ? 'btn--sec' : 'btn--ter'} favorito`} aria-pressed={es} onClick={alternar}>
+      <span aria-hidden="true">{es ? '★' : '☆'}</span> {es ? 'En favoritos' : 'Agregar a favoritos'}
+    </button>
   );
 }

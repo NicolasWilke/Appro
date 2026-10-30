@@ -46,12 +46,18 @@ export function NuevoPedido() {
     ...(await rp.valoresReferencia()),
     yo: (await rp.obtenerPersona(usuarioId)) as Comprador,
     proveedores: await rp.listarProveedores(),
+    favoritos: await rp.favoritos(usuarioId),
   }), [usuarioId]);
 
   const base = data ? valorDelRubro(data.valores, r, data.yo?.region) : undefined;
   const valor = base && data ? ajustar(base, factorInflacion(base.fecha, data.mesesIso, data.inflacion)) : undefined;
   const cant1 = Number(items[0]?.cantidad) || 0;
-  const candidatos = useMemo(() => (data?.proveedores ?? []).filter((p) => verTodos || p.rubros.includes(r)), [data, r, verTodos]);
+  const favoritos = useMemo(() => data?.favoritos ?? [], [data]);
+  // Los favoritos van primero y se muestran aunque sean de otro rubro.
+  const candidatos = useMemo(() => (data?.proveedores ?? [])
+    .filter((p) => verTodos || p.rubros.includes(r) || favoritos.includes(p.id))
+    .sort((a, b) => Number(favoritos.includes(b.id)) - Number(favoritos.includes(a.id))), [data, r, verTodos, favoritos]);
+  const sumarFavoritos = () => setInvitados([...invitados, ...favoritos.filter((f) => !invitados.includes(f))].slice(0, INVITADOS_MAX));
 
   if (rol !== 'comprador') return <div className="envoltura pagina"><Vacio titulo="Solo los compradores publican pedidos" accion={{ a: '/cotizaciones', texto: 'Ver pedidos' }} /></div>;
 
@@ -161,6 +167,7 @@ export function NuevoPedido() {
             <div className="invitados">
               <div className="invitados__cab">
                 <span className="tenue">{invitados.length} de hasta {INVITADOS_MAX} invitados</span>
+                {favoritos.length > 0 && <button type="button" className="btn btn--sec btn--chico" onClick={sumarFavoritos} disabled={favoritos.every((f) => invitados.includes(f))}>★ Invitar a mis {favoritos.length} favoritos</button>}
                 <label className="opcion opcion--inline"><input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} /><span>Ver proveedores de todos los rubros</span></label>
               </div>
               {candidatos.length === 0 && <p className="tenue">No hay proveedores en {rubro(r).nombre.toLowerCase()} todavía. Marcá "Ver proveedores de todos los rubros".</p>}
@@ -168,7 +175,7 @@ export function NuevoPedido() {
                 {candidatos.map((p) => (
                   <label key={p.id} className="opcion opcion--inline">
                     <input type="checkbox" checked={invitados.includes(p.id)} disabled={!invitados.includes(p.id) && invitados.length >= INVITADOS_MAX} onChange={() => setInvitados(alternar(invitados, p.id))} />
-                    <span>{p.empresa} <span className="tenue">· {p.ciudad} · {p.rubros.map((x) => rubro(x).nombre).join(', ')}</span></span>
+                    <span>{favoritos.includes(p.id) ? `★ ${p.empresa}` : p.empresa} <span className="tenue">· {p.ciudad} · {p.rubros.map((x) => rubro(x).nombre).join(', ')}</span></span>
                   </label>
                 ))}
               </div>

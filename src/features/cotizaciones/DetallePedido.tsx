@@ -10,6 +10,7 @@ import type { Cotizacion, PedidoCotizacion, Proveedor } from '@/domain/types';
 import { fmt, t } from '@/i18n';
 import { Pill, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
+import { Consultas } from './Consultas';
 import { ListaEnlaces } from './Enlaces';
 import { Matriz } from './Matriz';
 import { CotizarModal } from './modales';
@@ -87,6 +88,8 @@ export function DetallePedido() {
           </div>
         )}
       </Seccion>
+
+      <Consultas pedido={pedido} rol={rol} usuarioId={usuarioId} esDueno={esDueno} />
 
       {rol === 'proveedor' && (
         <VistaProveedor pedido={pedido} mia={mia} provs={provs} usuarioId={usuarioId} abierto={abierto} onCotizar={() => setCotizando(true)} />
