@@ -1,6 +1,6 @@
 /* Layout: aplicación con cabecera fija y columnas de trabajo; la "ficha" con sello es la pieza central.
-   Marca APPRO: Montserrat y la paleta de la hoja de marca. */
-/* Paleta APPRO (hoja de marca): marino #0B2D5B, azul #1E88E5, verde #00C853, gris claro #E8EEF5.
+   Marca Proveo: Montserrat y la paleta de la hoja de marca. */
+/* Paleta Proveo (hoja de marca): marino #0B2D5B, azul #1E88E5, verde #00C853, gris claro #E8EEF5.
    El azul y el verde de marca no alcanzan contraste AA como texto sobre blanco: para texto y botones
    se usan #1565C0 y #00873A; los tonos puros quedan para acentos y el logo. */
 :root {

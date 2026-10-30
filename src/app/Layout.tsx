@@ -31,8 +31,14 @@ export function Layout() {
       <header className="cabecera">
         <div className="cabecera__in envoltura">
           <NavLink to="/" className="marca" aria-label={`${t.marca}, inicio`}>
-            <img className="marca__logo" src={MARCA.logo} alt="" width={38} height={38} />
-            <span className="marca__txt">{t.marca}<small>{t.bajada}</small></span>
+            <img className="marca__logo" src={MARCA.logo} alt="" width={40} height={40} />
+            <span className="marca__txt">
+              <img className="marca__nombre" src={MARCA.wordmark} alt={t.marca} width={109} height={26} />
+              {/* textLength estira cada renglón al ancho exacto de la palabra, con cualquier fuente. */}
+              <svg className="marca__lema" viewBox="0 0 109 21" width={109} height={21} aria-hidden="true">
+                {MARCA.lemaRenglones.map((r, i) => <text key={r} x={0} y={8 + i * 11} textLength={109} lengthAdjust="spacing">{r}</text>)}
+              </svg>
+            </span>
           </NavLink>
           <nav className="nav" aria-label="Principal">
             {NAV.map((n) => <NavLink key={n.a} to={n.a} end={n.fin} className="nav__link">{n.texto}</NavLink>)}
