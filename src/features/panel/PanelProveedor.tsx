@@ -15,6 +15,7 @@ import { ventanaAbierta } from '../red/FichaComprador';
 import { PedirContacto } from '../red/PedirContacto';
 import { TarjetaComprador } from '../red/TarjetaProveedor';
 import { ContactoPersona } from '../red/ContactoPersona';
+import { PedidosDeValor } from '../recientes/PedidosDeValor';
 
 const TONO: Record<string, TonoPill> = { pendiente: 'senal', aceptada: 'ok', postergada: 'neutro', cerrada: 'neutro' };
 
@@ -104,6 +105,7 @@ export function PanelProveedor() {
           </Seccion>
         </div>
         <div className="panel__col">
+          <PedidosDeValor />
           <Seccion titulo="Avisos de pedidos nuevos">
             <p className="tenue">Te llegan a {cuenta?.contacto.email} los pedidos de tus rubros.</p>
             <div className="segmento segmento--ancho segmento--apilable" role="group" aria-label="Frecuencia de avisos">

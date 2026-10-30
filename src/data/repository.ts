@@ -1,5 +1,5 @@
 import type {
-  Comprador, Consulta, DatosCuenta, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
+  Antecedente, Comprador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
   Persona, PlanId, Proveedor, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
@@ -38,8 +38,19 @@ export interface Repository {
    */
   cotizacionesDe(pedidoId: string): Promise<Cotizacion[]>;
   cotizar(cotizacion: NuevaCotizacion): Promise<Cotizacion>;
-  /** Adjudica cada ítem a un proveedor (todos al mismo = adjudicación total). */
-  adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string): Promise<void>;
+  /**
+   * Adjudica cada ítem a un proveedor (todos al mismo = adjudicación total). Con `listar`, cada ítem
+   * queda 90 días en Compras recientes, sin precio ni nombre del comprador.
+   */
+  adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string, listar?: boolean): Promise<void>;
+
+  /** Compras recientes de la red (últimos 90 días). Solo para compradores. */
+  antecedentes(): Promise<Antecedente[]>;
+  solicitarValor(antecedenteId: string, compradorId: string, cantidad: number, mensaje: string): Promise<SolicitudValor>;
+  /** Las que pidió un comprador o las que recibió un proveedor. */
+  solicitudesValor(filtro: { compradorId?: string; proveedorId?: string }): Promise<SolicitudValor[]>;
+  /** El proveedor informa su valor vigente (o declina, con precio null). */
+  responderValor(id: string, respuesta: { precioUnitario: number; vigencia: string; nota: string } | null): Promise<void>;
 
   /** Preguntas y respuestas del pedido, sin el autor. Las ve todo el que puede ver el pedido. */
   consultasDe(pedidoId: string): Promise<Consulta[]>;

@@ -6,12 +6,14 @@ import { REGION } from '@/config/region';
 import { t } from '@/i18n';
 import { useToast } from '@/ui/Toast';
 import { useAuth } from '@/auth/AuthProvider';
+import type { Rol } from '@/domain/types';
 
-const NAV = [
+const NAV: { a: string; texto: string; fin?: boolean; rol?: Rol }[] = [
   { a: '/', texto: t.nav.inicio, fin: true },
   { a: '/red', texto: t.nav.red },
   { a: '/cotizaciones', texto: t.nav.cotizaciones },
   { a: '/valores', texto: t.nav.valores },
+  { a: '/compras-recientes', texto: t.nav.recientes, rol: 'comprador' },
   { a: '/precios', texto: t.nav.precios },
   { a: '/planes', texto: t.nav.planes },
 ];
@@ -41,7 +43,7 @@ export function Layout() {
             </span>
           </NavLink>
           <nav className="nav" aria-label="Principal">
-            {NAV.map((n) => <NavLink key={n.a} to={n.a} end={n.fin} className="nav__link">{n.texto}</NavLink>)}
+            {NAV.filter((n) => !n.rol || n.rol === cuenta?.perfil.rol).map((n) => <NavLink key={n.a} to={n.a} end={n.fin} className="nav__link">{n.texto}</NavLink>)}
           </nav>
           <div className="cabecera__acc">
             {cuenta ? (

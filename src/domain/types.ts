@@ -161,6 +161,43 @@ export interface Consulta {
   respondida: string | null;
 }
 
+/** Un ítem adjudicado en la red, sin precio ni comprador: lo ven solo los compradores, 90 días. */
+export interface Antecedente {
+  id: string;
+  pedidoId: string;
+  itemId: string;
+  rubro: RubroId;
+  nombre: string;
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+  zona: string;
+  /** "Industria", "Logística"…: el comprador no se identifica. */
+  sectorComprador: string;
+  proveedorId: string;
+  /** yyyy-mm-dd */
+  adjudicado: string;
+}
+
+export type EstadoSolicitudValor = 'pendiente' | 'respondida' | 'declinada';
+/** Pedido de valor vigente al proveedor que ganó un antecedente. El precio llega solo a quien lo pidió. */
+export interface SolicitudValor {
+  id: string;
+  antecedenteId: string;
+  nombre: string;
+  unidad: string;
+  compradorId: string;
+  proveedorId: string;
+  cantidad: number;
+  mensaje: string;
+  estado: EstadoSolicitudValor;
+  creada: string;
+  precioUnitario: number | null;
+  vigencia: string | null;
+  nota: string | null;
+  respondida: string | null;
+}
+
 export interface SerieIndice {
   rubro: RubroId;
   item: string;

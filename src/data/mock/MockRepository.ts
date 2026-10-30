@@ -2,8 +2,9 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Comprador, Consulta, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Antecedente, Comprador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { antecedentesDe, antiguedad, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
@@ -23,7 +24,12 @@ interface Estado {
   valores?: Record<string, ValorReferencia>;
   consultas?: Consulta[];
   favoritos?: Record<string, string[]>;
+  antecedentes?: Antecedente[];
+  solicitudesValor?: SolicitudValor[];
 }
+
+const haceDias = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+const antecedentesIniciales = (): Antecedente[] => seed.antecedentes.map(({ dias, ...a }) => ({ ...a, adjudicado: haceDias(dias) }));
 
 const CLAVE = 'appro:demo:v3';
 const URL_PUBLICA = import.meta.env.VITE_PUBLIC_URL ?? 'https://appro.com.ar';
@@ -33,7 +39,7 @@ const inicial = (): Estado => {
   const e: Estado = clonar({
     compradores: seed.compradores, proveedores: seed.proveedores, solicitudes: seed.solicitudes,
     pedidos: seed.pedidos, cotizaciones: seed.cotizaciones, usos: seed.usos, mails: [], colaResumen: {},
-    consultas: seed.consultas, favoritos: seed.favoritos,
+    consultas: seed.consultas, favoritos: seed.favoritos, antecedentes: antecedentesIniciales(), solicitudesValor: [],
   });
   for (const p of e.pedidos) p.ofertas = e.cotizaciones.filter((c) => c.pedidoId === p.id).length;
   // La bandeja de la demo arranca con los avisos del pedido más reciente.
@@ -214,12 +220,48 @@ export class MockRepository implements Repository {
     return c;
   }
 
-  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string) {
+  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string, listar = true) {
     const p = this.estado.pedidos.find((x) => x.id === pedidoId);
     if (!p) throw new Error('Pedido inexistente');
     validarAdjudicacion(p, await this.cotizacionesDe(pedidoId), asignacion);
     const adjudicados = adjudicadosDe(asignacion);
     Object.assign(p, { estado: 'adjudicado', adjudicadaA: adjudicados[0], adjudicados, adjudicacion: { ...asignacion }, comentarioAdjudicacion: comentario.trim() });
+    if (listar) {
+      // La demo no guarda el sector de los compradores de ejemplo: sale como "Comprador de la red".
+      this.listaAntecedentes().push(...antecedentesDe(p, asignacion, ''));
+    }
+    this.guardar();
+  }
+
+  private listaAntecedentes() { return (this.estado.antecedentes ??= antecedentesIniciales()); }
+  private listaSolicitudesValor() { return (this.estado.solicitudesValor ??= []); }
+  async antecedentes() {
+    return this.listaAntecedentes().filter((a) => antiguedad(a).estado !== 'vencida').sort((a, b) => b.adjudicado.localeCompare(a.adjudicado));
+  }
+  async solicitarValor(antecedenteId: string, compradorId: string, cantidad: number, mensaje: string) {
+    const a = this.listaAntecedentes().find((x) => x.id === antecedenteId);
+    if (!a) throw new Error('Esa compra ya no está en la lista.');
+    validarSolicitudValor(a, cantidad, mensaje);
+    if (this.listaSolicitudesValor().some((s) => s.antecedenteId === antecedenteId && s.compradorId === compradorId && s.estado === 'pendiente'))
+      throw new Error('Ya le pediste el valor de este bien y todavía no respondió.');
+    const s: SolicitudValor = {
+      id: this.id('sv'), antecedenteId, nombre: a.nombre, unidad: a.unidad, compradorId, proveedorId: a.proveedorId, cantidad, mensaje: mensaje.trim(),
+      estado: 'pendiente', creada: hoy(), precioUnitario: null, vigencia: null, nota: null, respondida: null,
+    };
+    this.listaSolicitudesValor().unshift(s);
+    this.guardar();
+    return s;
+  }
+  async solicitudesValor(f: { compradorId?: string; proveedorId?: string }) {
+    return this.listaSolicitudesValor().filter((s) => (!f.compradorId || s.compradorId === f.compradorId) && (!f.proveedorId || s.proveedorId === f.proveedorId));
+  }
+  async responderValor(id: string, r: { precioUnitario: number; vigencia: string; nota: string } | null) {
+    const s = this.listaSolicitudesValor().find((x) => x.id === id);
+    if (!s || s.estado !== 'pendiente') throw new Error('Esta solicitud ya fue respondida.');
+    if (r) validarRespuestaValor(r.precioUnitario, r.vigencia);
+    Object.assign(s, r
+      ? { estado: 'respondida', precioUnitario: r.precioUnitario, vigencia: r.vigencia, nota: r.nota.trim(), respondida: hoy() }
+      : { estado: 'declinada', respondida: hoy() });
     this.guardar();
   }
 

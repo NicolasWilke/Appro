@@ -16,6 +16,7 @@ import { Bandeja } from '@/features/mails/Bandeja';
 import { ValoresReferencia } from '@/features/valores/ValoresReferencia';
 import { Layout } from './Layout';
 import { RequiereSesion } from './RequiereSesion';
+import { ComprasRecientes } from '@/features/recientes/ComprasRecientes';
 
 /** Enlaces viejos a /registro?rol=… siguen funcionando. */
 function RedirigirRegistro() {
@@ -42,6 +43,7 @@ const rutas = (
       <Route path="precios" element={<IndicePrecios />} />
       <Route path="mails" element={<Bandeja />} />
       <Route path="valores" element={<ValoresReferencia />} />
+      <Route path="compras-recientes" element={<ComprasRecientes />} />
       <Route path="admin/valores" element={<EditarValores />} />
     </Route>
     <Route path="*" element={<Landing />} />

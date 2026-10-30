@@ -358,3 +358,56 @@ describe('favoritos', () => {
     await assertSucceeds(deleteDoc(doc(como('comp1'), 'users', 'comp1', 'favoritos', 'prov1')));
   });
 });
+
+describe('compras recientes y pedidos de valor', () => {
+  const antecedente = (itemId: string, proveedorId: string, cambios: Record<string, unknown> = {}) => {
+    const i = ITEMS.find((x) => x.id === itemId)!;
+    return { pedidoId: 'PC-1', itemId, rubro: 'seguridad', nombre: i.nombre, descripcion: i.descripcion, cantidad: i.cantidad, unidad: i.unidad, zona: 'Rosario', sectorComprador: 'Industria', proveedorId, adjudicado: serverTimestamp(), ...cambios };
+  };
+  /** Como la app: la adjudicación y sus antecedentes en un mismo lote. */
+  const adjudicarYListar = (antecedentes: [string, Record<string, unknown>][], asignacion = { i1: 'prov1', i2: 'prov1' }) => {
+    const db = como('comp1');
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'pedidos', 'PC-1'), adjudicacion(asignacion, [...new Set(Object.values(asignacion))]));
+    for (const [id, d] of antecedentes) lote.set(doc(db, 'antecedentes', id), d);
+    return lote.commit();
+  };
+  const solicitud = (cambios: Record<string, unknown> = {}) => ({
+    antecedenteId: 'PC-1--i1', nombre: 'Vigilancia 24 h', unidad: 'horas vigilador', compradorId: 'comp2', proveedorId: 'prov1', cantidad: 600, mensaje: '',
+    estado: 'pendiente', creada: serverTimestamp(), precioUnitario: null, vigencia: null, nota: null, respondida: null, ...cambios,
+  });
+
+  it('se listan solo en el lote de la adjudicación, con el ganador real y sin precio', async () => {
+    await cotizar('prov1');
+    await assertFails(adjudicarYListar([['PC-1--i1', antecedente('i1', 'prov2')]]));
+    await assertFails(adjudicarYListar([['PC-1--i1', antecedente('i1', 'prov1', { precioUnitario: 15500 })]]));
+    await assertFails(adjudicarYListar([['otro-id', antecedente('i1', 'prov1')]]));
+    await assertSucceeds(adjudicarYListar([['PC-1--i1', antecedente('i1', 'prov1')], ['PC-1--i2', antecedente('i2', 'prov1')]]));
+    // Con el pedido ya adjudicado no se agregan antecedentes sueltos.
+    await assertFails(setDoc(doc(como('comp1'), 'antecedentes', 'PC-1--i1'), antecedente('i1', 'prov1')));
+  });
+  it('los ven los compradores, no los proveedores', async () => {
+    await cotizar('prov1');
+    await adjudicarYListar([['PC-1--i1', antecedente('i1', 'prov1')]]);
+    await assertSucceeds(getDocs(collection(como('comp2'), 'antecedentes')));
+    await assertFails(getDocs(collection(como('prov2'), 'antecedentes')));
+  });
+  it('un comprador pide valor al ganador; responde solo ese proveedor, una vez', async () => {
+    await cotizar('prov1');
+    await adjudicarYListar([['PC-1--i1', antecedente('i1', 'prov1')]]);
+    await assertFails(addDoc(collection(como('comp2'), 'solicitudesValor'), solicitud({ proveedorId: 'prov2' })));
+    await assertFails(addDoc(collection(como('comp2'), 'solicitudesValor'), solicitud({ compradorId: 'comp1' })));
+    await assertFails(addDoc(collection(como('comp2'), 'solicitudesValor'), solicitud({ precioUnitario: 1 })));
+    await assertFails(addDoc(collection(como('prov2'), 'solicitudesValor'), solicitud({ compradorId: 'prov2' })));
+    const ref = await addDoc(collection(como('comp2'), 'solicitudesValor'), solicitud());
+    const respuesta = { estado: 'respondida', precioUnitario: 16200, vigencia: '2026-12-31', nota: '', respondida: serverTimestamp() };
+    await assertFails(updateDoc(doc(como('prov2'), 'solicitudesValor', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('comp2'), 'solicitudesValor', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudesValor', ref.id), { ...respuesta, precioUnitario: 0 }));
+    await assertSucceeds(updateDoc(doc(como('prov1'), 'solicitudesValor', ref.id), respuesta));
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudesValor', ref.id), { estado: 'declinada', respondida: serverTimestamp() }));
+    await assertSucceeds(getDocs(query(collection(como('comp2'), 'solicitudesValor'), where('compradorId', '==', 'comp2'))));
+    await assertSucceeds(getDocs(query(collection(como('prov1'), 'solicitudesValor'), where('proveedorId', '==', 'prov1'))));
+    await assertFails(getDocs(query(collection(como('comp1'), 'solicitudesValor'), where('compradorId', '==', 'comp2'))));
+  });
+});

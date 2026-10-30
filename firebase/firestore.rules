@@ -291,6 +291,61 @@ service cloud.firestore {
       }
     }
 
+    // ── Compras recientes: un ítem adjudicado, sin precio ni comprador. Lo ven solo los compradores.
+    // Se crea en el mismo lote que la adjudicación (antes del lote el pedido seguía abierto), por eso no se puede inventar.
+    match /antecedentes/{aid} {
+      allow read: if tienePerfil() && miRol() == 'comprador';
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(['pedidoId', 'itemId', 'rubro', 'nombre', 'descripcion', 'cantidad', 'unidad', 'zona', 'sectorComprador', 'proveedorId', 'adjudicado'])
+        && request.resource.data.keys().hasAll(['pedidoId', 'itemId', 'rubro', 'nombre', 'descripcion', 'cantidad', 'unidad', 'zona', 'sectorComprador', 'proveedorId', 'adjudicado'])
+        && aid == request.resource.data.pedidoId + '--' + request.resource.data.itemId
+        && get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.compradorId == request.auth.uid
+        && get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.estado == 'abierto'
+        && getAfter(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.estado == 'adjudicado'
+        && getAfter(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.adjudicacion[request.resource.data.itemId] == request.resource.data.proveedorId
+        && request.resource.data.rubro == get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.rubro
+        && request.resource.data.zona == get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data.zona
+        && texto(request.resource.data.nombre, 1, 120)
+        && texto(request.resource.data.descripcion, 0, 1000)
+        && request.resource.data.cantidad is number && request.resource.data.cantidad > 0
+        && texto(request.resource.data.unidad, 1, 30)
+        && texto(request.resource.data.sectorComprador, 0, 60)
+        && request.resource.data.adjudicado == request.time;
+      allow update, delete: if false;
+    }
+
+    // Pedido de valor vigente al proveedor que ganó un antecedente: el precio lo ven solo las dos partes.
+    match /solicitudesValor/{sid} {
+      allow read: if autenticado() && (resource.data.compradorId == request.auth.uid || resource.data.proveedorId == request.auth.uid);
+      allow create: if autenticado()
+        && miRol() == 'comprador'
+        && request.resource.data.keys().hasOnly(['antecedenteId', 'nombre', 'unidad', 'compradorId', 'proveedorId', 'cantidad', 'mensaje', 'estado', 'creada', 'precioUnitario', 'vigencia', 'nota', 'respondida'])
+        && request.resource.data.keys().hasAll(['antecedenteId', 'nombre', 'unidad', 'compradorId', 'proveedorId', 'cantidad', 'mensaje', 'estado', 'creada', 'precioUnitario', 'vigencia', 'nota', 'respondida'])
+        && request.resource.data.compradorId == request.auth.uid
+        && request.resource.data.proveedorId == get(/databases/$(database)/documents/antecedentes/$(request.resource.data.antecedenteId)).data.proveedorId
+        && request.resource.data.nombre == get(/databases/$(database)/documents/antecedentes/$(request.resource.data.antecedenteId)).data.nombre
+        && request.resource.data.unidad == get(/databases/$(database)/documents/antecedentes/$(request.resource.data.antecedenteId)).data.unidad
+        && request.resource.data.cantidad is number && request.resource.data.cantidad > 0
+        && texto(request.resource.data.mensaje, 0, 500)
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.precioUnitario == null
+        && request.resource.data.vigencia == null
+        && request.resource.data.nota == null
+        && request.resource.data.respondida == null
+        && request.resource.data.creada == request.time;
+      allow update: if autenticado()
+        && resource.data.proveedorId == request.auth.uid
+        && resource.data.estado == 'pendiente'
+        && request.resource.data.respondida == request.time
+        && ((request.resource.data.estado == 'respondida'
+            && soloCambia(['estado', 'precioUnitario', 'vigencia', 'nota', 'respondida'])
+            && request.resource.data.precioUnitario is number && request.resource.data.precioUnitario > 0
+            && request.resource.data.vigencia is string && request.resource.data.vigencia.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && texto(request.resource.data.nota, 0, 500))
+          || (request.resource.data.estado == 'declinada' && soloCambia(['estado', 'respondida'])));
+      allow delete: if false;
+    }
+
     // Para que el proveedor cuente sus propias cotizaciones (cupo del plan).
     match /{camino=**}/cotizaciones/{prov} {
       allow read: if autenticado() && resource.data.proveedorId == request.auth.uid;

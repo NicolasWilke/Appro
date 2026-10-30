@@ -5,9 +5,10 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Comprador, Consulta, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
+  Antecedente, Comprador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
 import { valores as valoresBase } from '../valores-referencia';
@@ -183,15 +184,60 @@ export class FirestoreRepository implements Repository {
     await lote.commit();
     return this.tocar({ ...nueva, id: nueva.proveedorId, creada: hoyIso() });
   }
-  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string) {
+  async adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string, listar = true) {
     const pedido = await this.obtenerPedido(pedidoId);
     if (!pedido) throw new Error('Pedido inexistente');
     validarAdjudicacion(pedido, await this.cotizacionesDe(pedidoId), asignacion);
     const adjudicados = adjudicadosDe(asignacion);
-    // El id de cada cotización es el uid del proveedor.
-    await updateDoc(doc(this.db, 'pedidos', pedidoId), {
+    // El id de cada cotización es el uid del proveedor. La adjudicación y las compras recientes van en un lote:
+    // las reglas aceptan cada antecedente solo si el pedido queda adjudicado a ese proveedor.
+    const lote = writeBatch(this.db);
+    lote.update(doc(this.db, 'pedidos', pedidoId), {
       estado: 'adjudicado', adjudicadaA: adjudicados[0], adjudicados, adjudicacion: asignacion, comentarioAdjudicacion: comentario.trim(),
     });
+    if (listar) {
+      const sector = ((await getDoc(doc(this.db, 'users', this.yo()))).data()?.sector as string | undefined) ?? '';
+      for (const { id, adjudicado: _a, ...a } of antecedentesDe(pedido, asignacion, sector.slice(0, 60))) {
+        lote.set(doc(this.db, 'antecedentes', id), { ...a, adjudicado: serverTimestamp() });
+      }
+    }
+    await lote.commit();
+    this.tocar(undefined);
+  }
+
+  // ── Compras recientes (antecedentes/{pedido--ítem}) y pedidos de valor (solicitudesValor)
+  async antecedentes() {
+    const snap = await getDocs(query(collection(this.db, 'antecedentes'), where('adjudicado', '>=', Timestamp.fromDate(new Date(`${desdeVentana()}T00:00:00-03:00`)))));
+    return snap.docs.map((d): Antecedente => {
+      const x = d.data();
+      return { id: d.id, pedidoId: x.pedidoId, itemId: x.itemId, rubro: x.rubro, nombre: x.nombre, descripcion: x.descripcion, cantidad: x.cantidad, unidad: x.unidad, zona: x.zona, sectorComprador: x.sectorComprador, proveedorId: x.proveedorId, adjudicado: fechaIso(x.adjudicado) };
+    }).sort((a, b) => b.adjudicado.localeCompare(a.adjudicado));
+  }
+  async solicitarValor(antecedenteId: string, compradorId: string, cantidad: number, mensaje: string) {
+    const d = await getDoc(doc(this.db, 'antecedentes', antecedenteId));
+    if (!d.exists()) throw new Error('Esa compra ya no está en la lista.');
+    const a = { ...(d.data() as Antecedente), id: d.id, adjudicado: fechaIso(d.data().adjudicado) };
+    validarSolicitudValor(a, cantidad, mensaje);
+    const datos = {
+      antecedenteId, nombre: a.nombre, unidad: a.unidad, compradorId, proveedorId: a.proveedorId, cantidad, mensaje: mensaje.trim(),
+      estado: 'pendiente' as const, precioUnitario: null, vigencia: null, nota: null, respondida: null,
+    };
+    const ref = await addDoc(collection(this.db, 'solicitudesValor'), { ...datos, creada: serverTimestamp() });
+    return this.tocar({ ...datos, id: ref.id, creada: hoyIso() });
+  }
+  async solicitudesValor(f: { compradorId?: string; proveedorId?: string }) {
+    const campo = f.compradorId ? 'compradorId' : 'proveedorId';
+    const snap = await getDocs(query(collection(this.db, 'solicitudesValor'), where(campo, '==', f.compradorId ?? f.proveedorId)));
+    return snap.docs.map((d): SolicitudValor => {
+      const x = d.data();
+      return { ...(x as SolicitudValor), id: d.id, creada: fechaIso(x.creada), respondida: x.respondida ? fechaIso(x.respondida) : null };
+    }).sort((a, b) => b.creada.localeCompare(a.creada));
+  }
+  async responderValor(id: string, r: { precioUnitario: number; vigencia: string; nota: string } | null) {
+    if (r) validarRespuestaValor(r.precioUnitario, r.vigencia);
+    await updateDoc(doc(this.db, 'solicitudesValor', id), r
+      ? { estado: 'respondida', precioUnitario: r.precioUnitario, vigencia: r.vigencia, nota: r.nota.trim(), respondida: serverTimestamp() }
+      : { estado: 'declinada', respondida: serverTimestamp() });
     this.tocar(undefined);
   }
 
