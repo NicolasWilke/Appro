@@ -13,7 +13,7 @@ import { Avatar, Chip, Copiable, Estrellas, Pill, Sello, Seccion, Vacio } from '
 import { useToast } from '@/ui/Toast';
 import { FichaComprador } from './FichaComprador';
 import { PedirContacto } from './PedirContacto';
-import { promedio } from './TarjetaProveedor';
+import { Insignias, promedio } from './TarjetaProveedor';
 
 export function Perfil() {
   const { id = '' } = useParams();
@@ -104,6 +104,7 @@ function PerfilProveedor({ p }: { p: Proveedor }) {
               {rol === 'comprador' && <BotonFavorito proveedorId={p.id} empresa={p.empresa} />}
             </div>
           </div>
+          <Insignias p={p} />
           {p.certificaciones.length > 0 && <div className="chips">{p.certificaciones.map((x) => <Pill key={x} tono="sello">{x}</Pill>)}</div>}
           {p.catalogo.length > 0 && (
             <>

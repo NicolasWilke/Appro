@@ -571,3 +571,13 @@ textarea { resize: vertical; line-height: 1.5; }
 .antecedente__datos dt { font-size: 0.75rem; color: var(--tenue); }
 .antecedente__datos dd { margin: 0; }
 .antecedente__form { display: grid; gap: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--linea); }
+
+/* Directorio: selección, comparación */
+.tarjeta.is-seleccionada { border-color: var(--sello); box-shadow: 0 0 0 1px var(--sello); }
+.tarjeta__sel { display: flex; gap: 0.5rem; align-items: center; font-size: var(--t-s); color: var(--tenue); cursor: pointer; }
+.tarjeta__sel input { width: 1.1rem; height: 1.1rem; flex: none; accent-color: var(--sello); }
+.pagina > .segmento { margin-bottom: 1rem; flex-wrap: wrap; }
+.barra-seleccion { position: sticky; bottom: 1rem; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 1.5rem; padding: 0.75rem 1rem; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-m); box-shadow: 0 6px 20px rgb(14 24 40 / 0.14); }
+.barra-seleccion > span { margin-right: auto; }
+.tabla--comparar { min-width: 560px; }
+.tabla--comparar tbody th { text-align: left; font: 500 var(--t-xs)/1.2 var(--f-mono); text-transform: uppercase; color: var(--tenue); background: var(--superficie-2); white-space: nowrap; }

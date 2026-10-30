@@ -179,6 +179,8 @@ Los pedidos creados antes de esta versión no tienen los campos nuevos y, hasta 
 
 **Compras recientes:** al adjudicar, el comprador puede listar cada ítem ganado en `antecedentes/{pedido--ítem}` (por defecto sí), en el mismo lote que la adjudicación: rubro, ítem, cantidad, zona, sector del comprador y proveedor, nunca el precio ni la empresa compradora. Solo los ven los compradores, durante 90 días (semáforo amarillo los últimos 15). Otro comprador le pide al proveedor su valor vigente (`solicitudesValor`); el proveedor tiene 3 días hábiles para informar un precio con vigencia o no cotizar, y solo lo ve quien lo pidió.
 
+**Directorio:** búsqueda por nombre, empresa, ciudad, catálogo o certificación; filtros de región, rubro, calificación mínima y certificaciones; para compradores, "Mis listas" (favoritos, ya me cotizaron, les adjudiqué). Insignias automáticas (Verificado, Top Rated con 4,5 o más y 5 reseñas, Certificado); el Destacado pago se rotula como publicidad. El promedio pondera el doble las reseñas de los últimos 24 meses y se muestra desde 3 reseñas. Se pueden comparar hasta 4 proveedores lado a lado e invitar a varios a un pedido privado de una vez.
+
 ### Reseñas
 
 Cuando un comprador adjudica, en el pedido aparece **Calificá a…** por cada ganador: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. La reseña del ganador principal es `resenas/{pedidoId}` y la de los demás `resenas/{pedidoId}--{proveedor}`; no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para un proveedor que ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.

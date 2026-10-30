@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useQuery, useRepo } from '@/data/DataProvider';
 import { CONDICIONES_PAGO, RUBROS, rubro } from '@/domain/catalogos';
@@ -33,8 +33,11 @@ export function NuevoPedido() {
   const [pago, setPago] = useState('60 días fecha factura');
   const [zona, setZona] = useState<string | null>(null);
   const [sobreCerrado, setSobreCerrado] = useState(true);
-  const [privado, setPrivado] = useState(false);
-  const [invitados, setInvitados] = useState<string[]>([]);
+  // Desde el directorio se llega con ?invitar=a,b,c: el pedido arranca privado con esos proveedores.
+  const [params] = useSearchParams();
+  const preinvitados = (params.get('invitar') ?? '').split(',').filter(Boolean).slice(0, INVITADOS_MAX);
+  const [privado, setPrivado] = useState(preinvitados.length > 0);
+  const [invitados, setInvitados] = useState<string[]>(preinvitados);
   const [verTodos, setVerTodos] = useState(false);
   const [documentos, setDocumentos] = useState<string[]>([]);
   const [otroDoc, setOtroDoc] = useState('');
@@ -55,8 +58,8 @@ export function NuevoPedido() {
   const favoritos = useMemo(() => data?.favoritos ?? [], [data]);
   // Los favoritos van primero y se muestran aunque sean de otro rubro.
   const candidatos = useMemo(() => (data?.proveedores ?? [])
-    .filter((p) => verTodos || p.rubros.includes(r) || favoritos.includes(p.id))
-    .sort((a, b) => Number(favoritos.includes(b.id)) - Number(favoritos.includes(a.id))), [data, r, verTodos, favoritos]);
+    .filter((p) => verTodos || p.rubros.includes(r) || favoritos.includes(p.id) || invitados.includes(p.id))
+    .sort((a, b) => Number(favoritos.includes(b.id)) - Number(favoritos.includes(a.id))), [data, r, verTodos, favoritos, invitados]);
   const sumarFavoritos = () => setInvitados([...invitados, ...favoritos.filter((f) => !invitados.includes(f))].slice(0, INVITADOS_MAX));
 
   if (rol !== 'comprador') return <div className="envoltura pagina"><Vacio titulo="Solo los compradores publican pedidos" accion={{ a: '/cotizaciones', texto: 'Ver pedidos' }} /></div>;
