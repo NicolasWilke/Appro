@@ -1,5 +1,5 @@
 import type {
-  Comprador, DatosCuenta, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
+  Comprador, Consulta, DatosCuenta, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
   Persona, PlanId, Proveedor, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
@@ -40,6 +40,17 @@ export interface Repository {
   cotizar(cotizacion: NuevaCotizacion): Promise<Cotizacion>;
   /** Adjudica cada ítem a un proveedor (todos al mismo = adjudicación total). */
   adjudicar(pedidoId: string, asignacion: Record<string, string>, comentario: string): Promise<void>;
+
+  /** Preguntas y respuestas del pedido, sin el autor. Las ve todo el que puede ver el pedido. */
+  consultasDe(pedidoId: string): Promise<Consulta[]>;
+  /** Un proveedor que puede cotizar pregunta, mientras el pedido recibe ofertas. */
+  preguntar(pedidoId: string, pregunta: string, proveedorId: string): Promise<Consulta>;
+  /** Solo el comprador del pedido, una vez por consulta. */
+  responderConsulta(pedidoId: string, consultaId: string, respuesta: string): Promise<void>;
+
+  /** Proveedores favoritos de un comprador, para invitarlos rápido a pedidos privados. */
+  favoritos(compradorId: string): Promise<string[]>;
+  marcarFavorito(compradorId: string, proveedorId: string, favorito: boolean): Promise<void>;
 
   /** A quién le llegó (o le va a llegar) el aviso de un pedido. Solo lo ve quien lo publicó. */
   avisosDePedido(pedidoId: string): Promise<{ proveedorId: string; empresa: string; via: 'mail' | 'resumen' }[]>;

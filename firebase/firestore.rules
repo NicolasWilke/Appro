@@ -117,6 +117,17 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if esDuenio(uid);
       }
+
+      // Proveedores favoritos del comprador: privados, solo los ve y cambia él.
+      match /favoritos/{prov} {
+        allow read, delete: if esDuenio(uid);
+        allow create: if esDuenio(uid)
+          && rolDe(uid) == 'comprador'
+          && rolDe(prov) == 'proveedor'
+          && request.resource.data.keys().hasOnly(['desde'])
+          && request.resource.data.desde == request.time;
+        allow update: if false;
+      }
     }
 
     // Plan y verificaciones: los define el equipo, nunca el usuario.
@@ -249,6 +260,29 @@ service cloud.firestore {
           // El contador del pedido sube en el mismo lote.
           && getAfter(/databases/$(database)/documents/pedidos/$(id)).data.ofertas == pedido(id).get('ofertas', 0) + 1;
         allow update, delete: if false;
+      }
+
+      // Consultas anónimas: no se guarda quién preguntó. Pregunta un proveedor que puede ver el pedido mientras
+      // recibe ofertas; responde solo el comprador, una vez. Las leen todos los que ven el pedido.
+      match /consultas/{cid} {
+        allow read: if tienePerfil() && puedeVerPedido(pedido(id));
+        allow create: if tienePerfil()
+          && miRol() == 'proveedor'
+          && puedeVerPedido(pedido(id))
+          && recibeOfertas(pedido(id))
+          && request.resource.data.keys().hasOnly(['pregunta', 'respuesta', 'respondida', 'creada'])
+          && request.resource.data.keys().hasAll(['pregunta', 'respuesta', 'respondida', 'creada'])
+          && texto(request.resource.data.pregunta, 10, 500)
+          && request.resource.data.respuesta == null
+          && request.resource.data.respondida == null
+          && request.resource.data.creada == request.time;
+        allow update: if autenticado()
+          && pedido(id).compradorId == request.auth.uid
+          && resource.data.respuesta == null
+          && soloCambia(['respuesta', 'respondida'])
+          && texto(request.resource.data.respuesta, 1, 1000)
+          && request.resource.data.respondida == request.time;
+        allow delete: if false;
       }
 
       match /avisos/{prov} {

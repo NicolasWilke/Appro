@@ -1,14 +1,14 @@
 import {
-  addDoc, collection, collectionGroup, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch,
+  addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Comprador, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
+  Comprador, Consulta, DatosCuenta, Embudo, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
-import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido } from '@/domain/rfq';
+import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
 import { valores as valoresBase } from '../valores-referencia';
 import type { NuevaCotizacion, NuevoPedido, Repository } from '../repository';
@@ -196,6 +196,37 @@ export class FirestoreRepository implements Repository {
   }
 
   // ── Avisos por mail (los manda server/avisos.ts; acá solo se consultan)
+  // ── Consultas (pedidos/{id}/consultas) y favoritos (users/{comprador}/favoritos/{proveedor})
+  async consultasDe(pedidoId: string) {
+    const snap = await getDocs(collection(this.db, 'pedidos', pedidoId, 'consultas'));
+    return snap.docs.map((d): Consulta => {
+      const x = d.data();
+      return { id: d.id, pedidoId, pregunta: x.pregunta, respuesta: x.respuesta ?? null, creada: fechaIso(x.creada), respondida: x.respondida ? fechaIso(x.respondida) : null };
+    }).sort((a, b) => a.creada.localeCompare(b.creada));
+  }
+  async preguntar(pedidoId: string, pregunta: string) {
+    const pedido = await this.obtenerPedido(pedidoId);
+    if (!pedido) throw new Error('Pedido inexistente');
+    validarPregunta(pedido, this.yo(), pregunta);
+    // Sin autor: las reglas exigen exactamente estos campos para que la consulta sea anónima.
+    const ref = await addDoc(collection(this.db, 'pedidos', pedidoId, 'consultas'), { pregunta: pregunta.trim(), respuesta: null, respondida: null, creada: serverTimestamp() });
+    return this.tocar({ id: ref.id, pedidoId, pregunta: pregunta.trim(), respuesta: null, creada: hoyIso(), respondida: null });
+  }
+  async responderConsulta(pedidoId: string, consultaId: string, respuesta: string) {
+    validarRespuestaConsulta(respuesta);
+    await updateDoc(doc(this.db, 'pedidos', pedidoId, 'consultas', consultaId), { respuesta: respuesta.trim(), respondida: serverTimestamp() });
+    this.tocar(undefined);
+  }
+  async favoritos(compradorId: string) {
+    const snap = await getDocs(collection(this.db, 'users', compradorId, 'favoritos'));
+    return snap.docs.map((d) => d.id);
+  }
+  async marcarFavorito(compradorId: string, proveedorId: string, favorito: boolean) {
+    const ref = doc(this.db, 'users', compradorId, 'favoritos', proveedorId);
+    await (favorito ? setDoc(ref, { desde: serverTimestamp() }) : deleteDoc(ref));
+    this.tocar(undefined);
+  }
+
   async avisosDePedido(pedidoId: string) {
     const snap = await getDocs(collection(this.db, 'pedidos', pedidoId, 'avisos')).catch(() => null);
     if (snap && !snap.empty) return snap.docs.map((d) => ({ proveedorId: d.id, empresa: d.data().empresa as string, via: d.data().via as 'mail' | 'resumen' }));

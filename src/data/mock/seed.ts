@@ -1,5 +1,5 @@
 import { cierreIso } from '@/domain/rfq';
-import type { Comprador, Cotizacion, PedidoCotizacion, Proveedor, SerieIndice, SolicitudContacto, Uso } from '@/domain/types';
+import type { Comprador, Consulta, Cotizacion, PedidoCotizacion, Proveedor, SerieIndice, SolicitudContacto, Uso } from '@/domain/types';
 
 // Personas y empresas ficticias. Cualquier parecido es coincidencia.
 const v = { idFiscal: true, mailCorporativo: true, cargoRevisado: true };
@@ -252,6 +252,14 @@ export const cotizaciones: Cotizacion[] = [
   { id: 'c-10', pedidoId: 'PC-2621', proveedorId: 'lucia-romero', items: [it('i1', 7100), it('i2', 1090), it('i3', 3100)], precioUnitario: 7100,
     plazoDias: 12, vigencia: '2026-11-30', pago: '60 días fecha factura', nota: '', adjuntos: [], creada: '2026-10-26' },
 ];
+
+export const consultas: Consulta[] = [
+  { id: 'q-1', pedidoId: 'PC-2611', pregunta: '¿El film lleva impresión en 8 colores o alcanza con 6? ¿Tienen el arte final en PDF?', respuesta: 'Son 6 colores. El arte final lo compartimos con quien cotice: está en el enlace de la ficha técnica.', creada: '2026-10-25', respondida: '2026-10-26' },
+  { id: 'q-2', pedidoId: 'PC-2611', pregunta: '¿Aceptan entregas parciales de 3.000 kg por semana en lugar de una sola entrega?', respuesta: null, creada: '2026-10-28', respondida: null },
+];
+
+/** Proveedores favoritos por comprador. */
+export const favoritos: Record<string, string[]> = { 'laura-gimenez': ['ramiro-ortiz', 'lucia-romero'] };
 
 export const usos: Record<string, Uso> = {
   'ramiro-ortiz': { solicitudesUsadas: 17, respuestasUsadas: 9 },

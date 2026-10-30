@@ -2,9 +2,9 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Comprador, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Comprador, Consulta, Cotizacion, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
-import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido } from '@/domain/rfq';
+import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
 import * as seed from './seed';
@@ -21,6 +21,8 @@ interface Estado {
   colaResumen: Record<string, string[]>;
   /** Valores de referencia editados desde el panel de administración, por id */
   valores?: Record<string, ValorReferencia>;
+  consultas?: Consulta[];
+  favoritos?: Record<string, string[]>;
 }
 
 const CLAVE = 'appro:demo:v3';
@@ -31,6 +33,7 @@ const inicial = (): Estado => {
   const e: Estado = clonar({
     compradores: seed.compradores, proveedores: seed.proveedores, solicitudes: seed.solicitudes,
     pedidos: seed.pedidos, cotizaciones: seed.cotizaciones, usos: seed.usos, mails: [], colaResumen: {},
+    consultas: seed.consultas, favoritos: seed.favoritos,
   });
   for (const p of e.pedidos) p.ofertas = e.cotizaciones.filter((c) => c.pedidoId === p.id).length;
   // La bandeja de la demo arranca con los avisos del pedido más reciente.
@@ -217,6 +220,36 @@ export class MockRepository implements Repository {
     validarAdjudicacion(p, await this.cotizacionesDe(pedidoId), asignacion);
     const adjudicados = adjudicadosDe(asignacion);
     Object.assign(p, { estado: 'adjudicado', adjudicadaA: adjudicados[0], adjudicados, adjudicacion: { ...asignacion }, comentarioAdjudicacion: comentario.trim() });
+    this.guardar();
+  }
+
+  async consultasDe(pedidoId: string) {
+    return (this.estado.consultas ??= clonar(seed.consultas)).filter((c) => c.pedidoId === pedidoId)
+      .sort((a, b) => a.creada.localeCompare(b.creada) || a.id.localeCompare(b.id));
+  }
+  async preguntar(pedidoId: string, pregunta: string, proveedorId: string) {
+    const pedido = this.estado.pedidos.find((x) => x.id === pedidoId);
+    if (!pedido) throw new Error('Pedido inexistente');
+    validarPregunta(pedido, proveedorId, pregunta);
+    const c: Consulta = { id: this.id('q'), pedidoId, pregunta: pregunta.trim(), respuesta: null, creada: hoy(), respondida: null };
+    (this.estado.consultas ??= clonar(seed.consultas)).push(c);
+    this.guardar();
+    return c;
+  }
+  async responderConsulta(pedidoId: string, consultaId: string, respuesta: string) {
+    validarRespuestaConsulta(respuesta);
+    const c = (this.estado.consultas ??= clonar(seed.consultas)).find((x) => x.id === consultaId && x.pedidoId === pedidoId);
+    if (!c) throw new Error('Consulta inexistente');
+    if (c.respuesta) throw new Error('Esta consulta ya tiene respuesta.');
+    Object.assign(c, { respuesta: respuesta.trim(), respondida: hoy() });
+    this.guardar();
+  }
+
+  async favoritos(compradorId: string) { return [...((this.estado.favoritos ??= clonar(seed.favoritos))[compradorId] ?? [])]; }
+  async marcarFavorito(compradorId: string, proveedorId: string, favorito: boolean) {
+    const todos = (this.estado.favoritos ??= clonar(seed.favoritos));
+    const lista = (todos[compradorId] ?? []).filter((x) => x !== proveedorId);
+    todos[compradorId] = favorito ? [...lista, proveedorId] : lista;
     this.guardar();
   }
 

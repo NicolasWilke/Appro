@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   adjudicadosDe, ahorro, cierreIso, cerrado, horaDeCierre, isoArgentina, itemsCotizadosDe, itemsDe, linea, matriz, preciosVisibles, recibeOfertas,
-  sugerirAdjudicacion, totales, validarAdjudicacion, validarCotizacion, validarPedido,
+  sugerirAdjudicacion, totales, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta,
 } from './rfq';
 import type { Cotizacion, PedidoCotizacion } from './types';
 
@@ -116,4 +116,17 @@ it('isoArgentina muestra la hora de cierre de Argentina sin importar la zona', (
   const iso = isoArgentina(new Date('2026-11-08T21:00:00Z'));
   expect(iso).toBe('2026-11-08T18:00:00-03:00');
   expect(horaDeCierre(iso)).toBe('18:00');
+});
+
+describe('consultas', () => {
+  it('pregunta quien puede cotizar, con 10 a 500 caracteres, antes del cierre', () => {
+    expect(() => validarPregunta(pedido(), 'p1', '¿Aceptan entregas parciales?', AHORA)).not.toThrow();
+    expect(() => validarPregunta(pedido(), 'p1', 'Corta', AHORA)).toThrow(/entre 10 y 500/);
+    expect(() => validarPregunta(pedido({ privado: true, invitados: ['p2'] }), 'p1', '¿Aceptan entregas parciales?', AHORA)).toThrow(/privado/);
+    expect(() => validarPregunta(pedido(), 'p1', '¿Aceptan entregas parciales?', new Date('2027-01-01T00:00:00-03:00'))).toThrow(/cerró/);
+  });
+  it('la respuesta no puede estar vacía', () => {
+    expect(() => validarRespuestaConsulta('   ')).toThrow();
+    expect(() => validarRespuestaConsulta('Sí.')).not.toThrow();
+  });
 });
