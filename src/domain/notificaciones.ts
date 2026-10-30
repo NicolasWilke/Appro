@@ -22,12 +22,12 @@ export function planDeAvisos(pedido: PedidoCotizacion, proveedores: Proveedor[])
   };
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const numero = (n: number) => new Intl.NumberFormat('es-AR').format(n);
 const conPunto = (s: string) => (s.endsWith('.') ? s : `${s}.`);
-const fecha = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/');
+export const fecha = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/');
 /** Cierre con día y hora de Buenos Aires: "08/11 18:00". */
-const cierre = (p: PedidoCotizacion) => `${fecha(p.cierre)} ${p.cierraEn.slice(11, 16)}`;
+export const cierre = (p: PedidoCotizacion) => `${fecha(p.cierre)} ${p.cierraEn.slice(11, 16)}`;
 const cantidad = (p: PedidoCotizacion) => (p.items.length > 1 ? `${p.items.length} ítems` : `${numero(p.items[0].cantidad)} ${p.items[0].unidad}`);
 
 /** Cómo se nombra al comprador en un mail: respeta el perfil semi-anónimo y nunca incluye mail ni teléfono. */
@@ -35,7 +35,7 @@ export function quienCompra(c: Comprador) {
   return c.semiAnonimo ? `${c.cargo} de ${c.empresa}` : `${c.nombre} ${c.apellido}, ${c.cargo} de ${c.empresa}`;
 }
 
-const marco = (cuerpo: string, pie: string) => `
+export const marco = (cuerpo: string, pie: string) => `
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0B2D5B;background:#ffffff;border:1px solid #D3DCE8;border-radius:10px;overflow:hidden">
   <div style="padding:14px 20px;border-bottom:3px solid #1E88E5;background:#0B2D5B;color:#ffffff"><span style="font-weight:800;font-size:20px;letter-spacing:0.02em">Proveo</span><span style="display:block;font-size:12px;color:#B9CBE3;margin-top:2px">Conectando empresas. Generando negocios.</span></div>
   <div style="padding:20px">${cuerpo}</div>

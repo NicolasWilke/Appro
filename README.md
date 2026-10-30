@@ -153,6 +153,8 @@ Para saber qué versión está publicada, mirá el pie de página: dice `Firebas
 
 El plan Spark no tiene Cloud Functions, así que nada corre en Firebase cuando se publica un pedido. El pedido queda guardado con `avisado: false` y `npm run avisos` hace el resto: busca los pedidos sin avisar, manda los mails, deja registro en `pedidos/{id}/avisos` (lo que ve el comprador) y lo marca avisado. `npm run avisos -- --resumen` manda los resúmenes diarios.
 
+La misma corrida manda las **alertas por hito** (`server/alertas.ts`): al comprador, ofertas nuevas (sin precios) y el cierre del plazo; a los proveedores que no cotizaron, un recordatorio 24 h antes del cierre; a todos los del pedido, cada consulta respondida (sin decir quién preguntó); al adjudicar, felicitaciones con el contacto del comprador a los ganadores y un aviso cordial a los demás, sin nombrar al ganador; y en Compras recientes, el pedido de valor al proveedor y su respuesta al comprador. Cada alerta deja una marca en Firestore (`recordado`, `ofertasAvisadas`, `cierreAvisado`, `adjudicacionAvisada`, `avisada`, `respuestaAvisada`) para no repetirse. Con GitHub Actions (`.github/workflows/avisos.yml`) corre cada 30 minutos.
+
 Para que corra solo, `.github/workflows/avisos.yml` lo ejecuta cada 30 minutos y el resumen a las 8:00 de Argentina, gratis con GitHub Actions. Viene apagado: primero cargá en GitHub los secretos que lista el archivo (la clave de servicio, el id del proyecto y los datos de Resend) y después borrá los `#` de las líneas `schedule` del archivo. Si los avisos tienen que salir al instante, la alternativa es pasar a Blaze y moverlo a una Cloud Function.
 
 ### Valores de referencia editables
