@@ -1,7 +1,7 @@
 import type { ValorReferencia } from '@/domain/types';
 
 /*
- * VALORES DE REFERENCIA · los carga el equipo de APPRO.
+ * VALORES DE REFERENCIA · los carga el equipo de Proveo.
  *
  * Cómo editar:
  *  - min, mediana y max en pesos, sin IVA, por la unidad indicada. Si están en 0 se muestra "Valor a definir".

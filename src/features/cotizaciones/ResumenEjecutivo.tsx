@@ -145,7 +145,7 @@ export function ResumenEjecutivo() {
           })}
           {pedido.comentarioAdjudicacion && <div className="hoja__comentario"><p className="etq">Comentarios del comprador</p><p>{pedido.comentarioAdjudicacion}</p></div>}
         </section>
-        <footer className="hoja__pie">Generado con APPRO el {hoy()}. Los precios de proveedores no adjudicados son confidenciales: no compartas este reporte fuera de tu empresa.</footer>
+        <footer className="hoja__pie">Generado con Proveo el {hoy()}. Los precios de proveedores no adjudicados son confidenciales: no compartas este reporte fuera de tu empresa.</footer>
       </article>
     </div>
   );

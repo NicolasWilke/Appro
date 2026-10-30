@@ -63,7 +63,7 @@ export function EditarValores() {
   if (!data.admin) {
     return (
       <div className="envoltura pagina">
-        <Vacio titulo="Solo para el equipo de APPRO" accion={{ a: '/valores', texto: 'Ver los valores' }}>
+        <Vacio titulo="Solo para el equipo de Proveo" accion={{ a: '/valores', texto: 'Ver los valores' }}>
           Para editar valores, tu cuenta tiene que figurar en la colección admins de Firestore.
         </Vacio>
       </div>

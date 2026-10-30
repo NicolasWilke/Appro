@@ -38,9 +38,10 @@ a:hover { color: var(--sello-hover); }
 .cabecera__in { display: flex; align-items: center; gap: 1.25rem; min-height: 64px; flex-wrap: wrap; padding-block: 0.5rem; }
 .marca { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; color: var(--tinta); }
 .marca:hover { color: var(--tinta); }
-.marca__logo { width: 38px; height: 38px; object-fit: contain; flex: none; }
-.marca__txt { font: 800 1.3rem/1 var(--f-display); letter-spacing: 0.06em; display: flex; flex-direction: column; gap: 4px; }
-.marca__txt small { font: 500 0.6875rem/1 var(--f-texto); color: var(--tenue); letter-spacing: 0.01em; }
+.marca__logo { width: 40px; height: 40px; object-fit: contain; flex: none; }
+.marca__txt { display: flex; flex-direction: column; gap: 3px; width: 109px; }
+.marca__nombre { display: block; width: 109px; height: auto; }
+.marca__lema { display: block; overflow: visible; fill: var(--tenue); font: 500 8.5px var(--f-texto); }
 .nav { display: flex; gap: 0.25rem; flex: 1; overflow-x: auto; scrollbar-width: none; }
 .nav__link { padding: 0.5rem 0.7rem; border-radius: var(--r-s); color: var(--tenue); text-decoration: none; font-weight: 500; font-size: var(--t-s); white-space: nowrap; }
 .nav__link:hover { color: var(--tinta); background: var(--superficie-2); }
@@ -57,7 +58,12 @@ a:hover { color: var(--sello-hover); }
   .nav { order: 3; flex-basis: 100%; }
   .cabecera__acc { margin-left: auto; }
 }
-@media (max-width: 480px) { .marca__txt small { display: none; } .cabecera__panel { display: none; } }
+@media (max-width: 480px) {
+  .cabecera__panel { display: none; }
+  .cabecera__in { gap: 0.75rem; }
+  .marca { gap: 0.4rem; }
+  .marca__logo { width: 32px; height: 32px; }
+}
 
 .principal { min-height: 60vh; }
 .pie { border-top: 1px solid var(--linea); margin-top: 4rem; background: var(--superficie); font-size: var(--t-s); }

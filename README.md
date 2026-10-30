@@ -1,4 +1,4 @@
-# APPRO · Conectando empresas. Generando negocios. (prototipo)
+# Proveo · Conectando empresas. Generando negocios. (prototipo)
 
 **Marca:** nombre, lema, colores y logo están en `src/config/marca.ts`. Para cambiar el logo, reemplazá `src/assets/logo.png` (o poné `logo.svg` y cambiá la importación en ese archivo). El ícono de la pestaña es `public/favicon.png`.
 
@@ -35,7 +35,7 @@ Probar el envío:
 
 ```bash
 npm run mail:prueba                     # imprime los mails en la terminal
-MAIL_PROVIDER=resend RESEND_API_KEY=re_xxx MAIL_FROM="APPRO <avisos@tudominio.com.ar>" \
+MAIL_PROVIDER=resend RESEND_API_KEY=re_xxx MAIL_FROM="Proveo <avisos@tudominio.com.ar>" \
 MAIL_PRUEBA_A=vos@tudominio.com.ar npm run mail:prueba   # los manda de verdad, todos a tu casilla
 ```
 
@@ -45,7 +45,7 @@ Para mandar a terceros, Resend exige verificar el dominio remitente (registros S
 
 Sección propia (`/valores`) que muestra rangos mínimo, mediana y máximo por hora, por unidad o por trabajo, filtrables por rubro, región y tipo, con una calculadora para estimar un requerimiento. El formulario de pedido muestra el valor del rubro mientras el comprador carga la cantidad.
 
-**Los valores los carga el equipo de APPRO en `src/data/valores-referencia.ts`** (instrucciones al inicio del archivo). Un valor en 0 se muestra como "Valor a definir" y la calculadora lo ignora. Con `fecha` cargada, la sección ofrece llevarlo a pesos de hoy por inflación.
+**Los valores los carga el equipo de Proveo en `src/data/valores-referencia.ts`** (instrucciones al inicio del archivo). Un valor en 0 se muestra como "Valor a definir" y la calculadora lo ignora. Con `fecha` cargada, la sección ofrece llevarlo a pesos de hoy por inflación.
 
 ### Seguridad privada (valores cargados)
 
@@ -78,11 +78,11 @@ El resto del perfil lo ve cualquier usuario registrado. Sin sesión no se ve nad
 
 Necesitás Node 22 o más nuevo. **Las colecciones no se crean a mano:** Firestore crea cada una la primera vez que la app o un script escribe en ella. Una base vacía es el punto de partida correcto.
 
-**En la consola** ([console.firebase.google.com](https://console.firebase.google.com), proyecto APPRO):
+**En la consola** ([console.firebase.google.com](https://console.firebase.google.com), proyecto Proveo):
 
 1. **Authentication → Comenzar → Método de acceso:** activá *Correo electrónico/contraseña*. En **Plantillas** poné el idioma en español.
 2. **Firestore Database:** ya la tenés creada. Si te pregunta, modo producción.
-3. **Configuración del proyecto (engranaje) → General → Tus apps → `</>` (Web):** registrá una app llamada APPRO, sin Hosting. Copiá los valores de `firebaseConfig`.
+3. **Configuración del proyecto (engranaje) → General → Tus apps → `</>` (Web):** registrá una app llamada Proveo, sin Hosting. Copiá los valores de `firebaseConfig`.
 4. **Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada:** se descarga un JSON. Guardalo en la carpeta del proyecto como `clave-servicio.json` (ya está en `.gitignore`; no lo compartas: da acceso total a la base).
 
 **En la carpeta del proyecto** (terminal de VS Code):
@@ -111,7 +111,7 @@ Después:
 ```bash
 npm install
 npx firebase login                      # abre el navegador para entrar con tu cuenta de Google
-npx firebase use --add                  # elegí el proyecto APPRO y poné "default" como alias
+npx firebase use --add                  # elegí el proyecto Proveo y poné "default" como alias
 npx firebase deploy --only firestore    # publica las reglas y los índices
 npm run sembrar                         # carga rubros, catálogos y valores de referencia
 npm run dev                             # abrí http://localhost:5173 y registrate
