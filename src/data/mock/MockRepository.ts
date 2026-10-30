@@ -9,6 +9,7 @@ import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido, v
 import { esMailCorporativo } from '@/domain/validaciones';
 import type { Repository } from '../repository';
 import * as seed from './seed';
+import { textoBuscable } from '@/domain/directorio';
 
 interface Estado {
   compradores: Comprador[];
@@ -95,7 +96,7 @@ function coincide(p: Persona, f?: FiltroRed) {
   if (f.soloVentanaAbierta && p.rol === 'comprador' && !ventanaAbierta(p)) return false;
   if (f.texto) {
     const t = f.texto.toLowerCase();
-    if (![p.nombre, p.apellido, p.empresa, p.cargo, p.ciudad].join(' ').toLowerCase().includes(t)) return false;
+    if (!textoBuscable(p).includes(t)) return false;
   }
   return true;
 }

@@ -8,6 +8,7 @@ import type {
   Antecedente, Comprador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
+import { textoBuscable } from '@/domain/directorio';
 import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
@@ -25,7 +26,7 @@ function coincide(p: Persona, f?: FiltroRed) {
   if (f.rubro && !p.rubros.includes(f.rubro)) return false;
   if (f.region && p.region !== f.region) return false;
   if (f.soloVentanaAbierta && p.rol === 'comprador' && !ventanaAbierta(p)) return false;
-  if (f.texto && ![p.nombre, p.apellido, p.empresa, p.ciudad].join(' ').toLowerCase().includes(f.texto.toLowerCase())) return false;
+  if (f.texto && !textoBuscable(p).includes(f.texto.toLowerCase())) return false;
   return true;
 }
 
