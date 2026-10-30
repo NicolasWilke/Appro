@@ -1,5 +1,5 @@
 import { cierreIso } from '@/domain/rfq';
-import type { Comprador, Consulta, Cotizacion, PedidoCotizacion, Proveedor, SerieIndice, SolicitudContacto, Uso } from '@/domain/types';
+import type { Antecedente, Comprador, Consulta, Cotizacion, PedidoCotizacion, Proveedor, SerieIndice, SolicitudContacto, Uso } from '@/domain/types';
 
 // Personas y empresas ficticias. Cualquier parecido es coincidencia.
 const v = { idFiscal: true, mailCorporativo: true, cargoRevisado: true };
@@ -256,6 +256,14 @@ export const cotizaciones: Cotizacion[] = [
 export const consultas: Consulta[] = [
   { id: 'q-1', pedidoId: 'PC-2611', pregunta: '¿El film lleva impresión en 8 colores o alcanza con 6? ¿Tienen el arte final en PDF?', respuesta: 'Son 6 colores. El arte final lo compartimos con quien cotice: está en el enlace de la ficha técnica.', creada: '2026-10-25', respondida: '2026-10-26' },
   { id: 'q-2', pedidoId: 'PC-2611', pregunta: '¿Aceptan entregas parciales de 3.000 kg por semana en lugar de una sola entrega?', respuesta: null, creada: '2026-10-28', respondida: null },
+];
+
+/** Compras recientes de ejemplo. `dias` es la antigüedad: la demo las fecha contando desde hoy. */
+export const antecedentes: (Omit<Antecedente, 'adjudicado'> & { dias: number })[] = [
+  { id: 'PC-2560--i1', pedidoId: 'PC-2560', itemId: 'i1', rubro: 'packaging', nombre: 'Film BOPP 20 µm transparente', descripcion: 'Bobinas de 500 mm, mandril de 3", tratamiento corona una cara', cantidad: 8000, unidad: 'kg', zona: 'Rosario', sectorComprador: 'Alimentos', proveedorId: 'ramiro-ortiz', dias: 12 },
+  { id: 'PC-2560--i2', pedidoId: 'PC-2560', itemId: 'i2', rubro: 'packaging', nombre: 'Cinta adhesiva PP 48 mm × 100 m', descripcion: 'Transparente, adhesivo acrílico', cantidad: 2400, unidad: 'rollos', zona: 'Rosario', sectorComprador: 'Alimentos', proveedorId: 'gustavo-lopez', dias: 12 },
+  { id: 'PC-2548--i1', pedidoId: 'PC-2548', itemId: 'i1', rubro: 'etiquetas', nombre: 'Etiqueta térmica 100 × 150 mm', descripcion: 'Papel térmico directo, rollo de 500, core 1"', cantidad: 300, unidad: 'rollos', zona: 'CABA', sectorComprador: 'Farmacéutica', proveedorId: 'lucia-romero', dias: 41 },
+  { id: 'PC-2531--i1', pedidoId: 'PC-2531', itemId: 'i1', rubro: 'quimicos', nombre: 'Hipoclorito de sodio 10 %', descripcion: 'Bidón de 20 l, grado industrial', cantidad: 150, unidad: 'bidones', zona: 'Córdoba', sectorComprador: 'Industria', proveedorId: 'valeria-mendez', dias: 80 },
 ];
 
 /** Proveedores favoritos por comprador. */

@@ -563,3 +563,11 @@ textarea { resize: vertical; line-height: 1.5; }
 .consulta__form { margin-top: 0.75rem; display: grid; gap: 0.4rem; justify-items: start; }
 .consulta__form .campo { width: 100%; }
 .favorito { margin-top: 0.6rem; }
+
+/* Compras recientes */
+.antecedente h3 { margin: 0; font-size: 1.05rem; }
+.antecedente__cab { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.antecedente__datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; margin: 0; }
+.antecedente__datos dt { font-size: 0.75rem; color: var(--tenue); }
+.antecedente__datos dd { margin: 0; }
+.antecedente__form { display: grid; gap: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--linea); }

@@ -15,6 +15,7 @@ import { ListaEnlaces } from './Enlaces';
 import { Matriz } from './Matriz';
 import { CotizarModal } from './modales';
 import { Resenar } from './Resenar';
+import { VENTANA_DIAS } from '@/domain/antecedentes';
 
 const cuando = (p: PedidoCotizacion) => `${fmt.fecha(p.cierre)} a las ${horaDeCierre(p.cierraEn)}`;
 
@@ -156,6 +157,7 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
   const visibles = preciosVisibles(pedido);
   const [asignacion, setAsignacion] = useState<Record<string, string>>({});
   const [comentario, setComentario] = useState('');
+  const [listar, setListar] = useState(true);
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
   const prov = (pid: string) => provs.find((p) => p.id === pid);
@@ -203,7 +205,7 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
     setError('');
     setEnviando(true);
     try {
-      await repo.adjudicar(pedido.id, asignacion, comentario);
+      await repo.adjudicar(pedido.id, asignacion, comentario, listar);
       avisar(ganadores.length === 1
         ? `Adjudicado a ${(prov(ganadores[0])?.empresa ?? '').replace(/\.$/, '')}. Cuando termine la entrega, calificalo desde este pedido.`
         : `Adjudicado entre ${ganadores.length} proveedores. Cuando terminen las entregas, calificalos desde este pedido.`);
@@ -231,6 +233,10 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
         <label className="campo" htmlFor="adj-comentario">
           <span>Justificación de la decisión (opcional, sale en el resumen ejecutivo)</span>
           <textarea id="adj-comentario" rows={2} maxLength={1000} value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Ej.: se prioriza el plazo de entrega para el film." />
+        </label>
+        <label className="opcion">
+          <input type="checkbox" checked={listar} onChange={(e) => setListar(e.target.checked)} />
+          <span>Listar en Compras recientes por {VENTANA_DIAS} días, sin precio ni el nombre de tu empresa. Otros compradores pueden pedirle valor al proveedor.</span>
         </label>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="form__acciones">

@@ -177,6 +177,8 @@ Los pedidos creados antes de esta versión no tienen los campos nuevos y, hasta 
 
 **Consultas:** mientras el pedido recibe ofertas, un proveedor que puede cotizar hace preguntas y el comprador las responde una vez. Todos los que ven el pedido leen preguntas y respuestas; no se guarda quién preguntó, así que nadie (ni el comprador) lo sabe. **Favoritos:** el comprador marca proveedores desde su perfil (`users/{comprador}/favoritos/{proveedor}`, privado) y al armar un pedido privado los invita con un clic.
 
+**Compras recientes:** al adjudicar, el comprador puede listar cada ítem ganado en `antecedentes/{pedido--ítem}` (por defecto sí), en el mismo lote que la adjudicación: rubro, ítem, cantidad, zona, sector del comprador y proveedor, nunca el precio ni la empresa compradora. Solo los ven los compradores, durante 90 días (semáforo amarillo los últimos 15). Otro comprador le pide al proveedor su valor vigente (`solicitudesValor`); el proveedor tiene 3 días hábiles para informar un precio con vigencia o no cotizar, y solo lo ve quien lo pidió.
+
 ### Reseñas
 
 Cuando un comprador adjudica, en el pedido aparece **Calificá a…** por cada ganador: entrega, calidad y facturación de 1 a 5 y un comentario de 20 a 500 caracteres. La reseña del ganador principal es `resenas/{pedidoId}` y la de los demás `resenas/{pedidoId}--{proveedor}`; no se edita, y las reglas solo la aceptan del comprador que publicó el pedido y para un proveedor que ganó. Se ve en el perfil del proveedor y como estrellas en su tarjeta.
@@ -200,7 +202,7 @@ npm run test:reglas                      # prueba las reglas
 ### Dónde está
 
 - `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 64 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `tests/reglas/`: 67 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
 - `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
 - `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
 - `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.
