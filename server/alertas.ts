@@ -8,7 +8,7 @@ import { cerro, mailCierre, mailConsultaRespondida, mailGanador, mailNoSeleccion
 import { venceEn } from '@/domain/antecedentes';
 import { destinatariosDePedido } from '@/domain/notificaciones';
 import type { Comprador, Persona, Proveedor, SolicitudValor } from '@/domain/types';
-import type { MailSender } from './mail/MailSender';
+import { fallas, MailMalConfigurado, type MailSender } from './mail/MailSender';
 import { db } from './firebaseAdmin';
 
 type Contacto = { email: string; telefono: string };
@@ -39,6 +39,8 @@ export async function mandarAlertas(mail: MailSender, base: string, ahora = new 
       await mail.enviar({ para: { nombre: `${p.nombre} ${p.apellido}`.trim(), email: c.email }, ...armado });
       enviados++;
     } catch (e) {
+      if (e instanceof MailMalConfigurado) throw e;
+      fallas.total++;
       console.error(`No se pudo mandar "${armado.asunto}" a ${p.empresa}:`, (e as Error).message);
     }
   };

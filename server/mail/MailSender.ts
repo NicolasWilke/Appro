@@ -25,6 +25,7 @@ export class ResendMailSender implements MailSender {
       headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: this.remitente, to: [m.para.email], subject: m.asunto, html: m.html, text: m.texto }),
     });
+    if (r.status === 401) throw new MailMalConfigurado(`Resend rechazó la clave (401): revisá el secreto RESEND_API_KEY. ${await r.text()}`);
     if (!r.ok) throw new Error(`Resend respondió ${r.status}: ${await r.text()}`);
     return (await r.json()) as { id: string };
   }
@@ -37,3 +38,9 @@ export function crearMailSender(env: Record<string, string | undefined> = proces
   }
   return new ConsolaMailSender();
 }
+
+/** La configuración del envío está mal (por ejemplo, la clave): no tiene sentido seguir ni marcar nada como avisado. */
+export class MailMalConfigurado extends Error {}
+
+/** Cuenta los envíos fallidos para que el proceso termine con error y GitHub Actions lo muestre en rojo. */
+export const fallas = { total: 0 };

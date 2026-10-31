@@ -11,7 +11,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { aPedido, aPersona, type Estado } from '@/data/firestore/mapeo';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import type { Comprador, PedidoCotizacion, Proveedor } from '@/domain/types';
-import { crearMailSender } from './mail/MailSender';
+import { crearMailSender, fallas, MailMalConfigurado } from './mail/MailSender';
 import { db } from './firebaseAdmin';
 import { mandarAlertas } from './alertas';
 
@@ -49,6 +49,8 @@ async function avisarNuevos() {
         await d.ref.collection('avisos').doc(prov.id).set({ via: 'mail', empresa: prov.empresa, enviado: FieldValue.serverTimestamp() });
         enviados++;
       } catch (e) {
+        if (e instanceof MailMalConfigurado) throw e;
+        fallas.total++;
         console.error(`No se pudo avisar a ${prov.empresa}:`, (e as Error).message);
       }
     }
@@ -78,14 +80,34 @@ async function mandarResumenes() {
       const c = await comprador(pedido.compradorId);
       if (c && pedido.estado === 'abierto') items.push({ pedido, comprador: c });
     }
-    if (items.length) await mail.enviar({ para: { nombre: `${prov.nombre} ${prov.apellido}`, email: prov.contacto.email }, ...mailResumenDiario(items, prov, URL_PUBLICA) });
+    if (items.length) {
+      try {
+        await mail.enviar({ para: { nombre: `${prov.nombre} ${prov.apellido}`, email: prov.contacto.email }, ...mailResumenDiario(items, prov, URL_PUBLICA) });
+      } catch (e) {
+        if (e instanceof MailMalConfigurado) throw e;
+        fallas.total++;
+        console.error(`No se pudo mandar el resumen a ${prov.empresa}:`, (e as Error).message);
+        continue; // queda en la cola para mañana
+      }
+    }
     await d.ref.delete();
     console.log(`Resumen a ${prov.empresa}: ${items.length} pedidos.`);
   }
 }
 
-if (process.argv.includes('--resumen')) await mandarResumenes();
-else {
-  await avisarNuevos();
-  await mandarAlertas(mail, URL_PUBLICA);
+try {
+  if (process.argv.includes('--resumen')) await mandarResumenes();
+  else {
+    await avisarNuevos();
+    await mandarAlertas(mail, URL_PUBLICA);
+  }
+} catch (e) {
+  // Con la clave mal se corta antes de marcar el pedido como avisado: se manda en la próxima corrida.
+  if (!(e instanceof MailMalConfigurado)) throw e;
+  console.error(e.message);
+  process.exitCode = 1;
+}
+if (fallas.total) {
+  console.error(`${fallas.total} mails no salieron. Revisá los mensajes de arriba.`);
+  process.exitCode = 1;
 }
