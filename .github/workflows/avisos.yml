@@ -1,7 +1,7 @@
 # Avisos por mail sin Cloud Functions (plan Spark).
 # En un repositorio privado, GitHub da 2.000 minutos gratis por mes: cada 30 minutos son unos 1.500. Más seguido se pasa del cupo.
-# Cada 30 minutos manda los avisos de pedidos nuevos y las alertas por hito (ofertas nuevas, cierre en 24 h, cierre,
-# consultas respondidas, adjudicación a ganadores y no seleccionados, pedidos de valor). Todos los días a las 8:13
+# Cada 30 minutos (disparado desde Netlify) manda los avisos de pedidos nuevos y las alertas por hito (ofertas nuevas, cierre en 24 h, cierre,
+# consultas respondidas, adjudicación a ganadores y no seleccionados, pedidos de valor). Todos los días a las 8:00
 # (Argentina) manda el resumen diario.
 # Secretos del repositorio (Settings → Secrets and variables → Actions):
 #   FIREBASE_SERVICE_ACCOUNT  contenido completo del JSON de la cuenta de servicio
@@ -13,7 +13,9 @@ name: Avisos por mail
 
 on:
   # Si un mail no sale, la corrida queda en rojo y GitHub te avisa por mail.
-  # Minutos 7 y 37 a propósito: GitHub demora o saltea las programaciones en punto (:00 y :30), que es cuando más carga tiene.
+  # Lo dispara cada 30 minutos netlify/functions/disparar-avisos.mts, porque el horario propio de GitHub
+  # pasaba horas sin correr en este repo. El schedule queda de respaldo: correr dos veces no duplica mails,
+  # porque cada aviso queda marcado y las corridas van de a una (concurrency).
   schedule:
     - cron: '7,37 * * * *'
     - cron: '13 11 * * *'
