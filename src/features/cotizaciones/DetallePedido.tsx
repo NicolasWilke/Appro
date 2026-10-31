@@ -13,6 +13,8 @@ import { useToast } from '@/ui/Toast';
 import { Consultas } from './Consultas';
 import { ListaEnlaces } from './Enlaces';
 import { Matriz } from './Matriz';
+import { matrizCsv, nombreArchivo } from '@/domain/exportar';
+import { descargar } from '@/ui/descargar';
 import { CotizarModal } from './modales';
 import { Resenar } from './Resenar';
 import { VENTANA_DIAS } from '@/domain/antecedentes';
@@ -180,7 +182,7 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
     const asig = pedido.adjudicacion ?? {};
     const a = ahorro(pedido, cotis, asig);
     return (
-      <Seccion titulo={`Comparador · ${cotis.length} ${cotis.length === 1 ? 'oferta' : 'ofertas'}`} extra={<Link to={`/cotizaciones/${pedido.id}/resumen`} className="btn btn--sec btn--chico">Resumen ejecutivo</Link>}>
+      <Seccion titulo={`Comparador · ${cotis.length} ${cotis.length === 1 ? 'oferta' : 'ofertas'}`} extra={<AccionesComparador pedido={pedido} cotis={cotis} provs={provs} />}>
         <div className="adjudicacion">
           {(pedido.adjudicados ?? []).map((pid) => {
             const items = pedido.items.filter((i) => asig[i.id] === pid);
@@ -217,7 +219,7 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
   };
 
   return (
-    <Seccion titulo={`Comparador · ${cotis.length} ${cotis.length === 1 ? 'oferta' : 'ofertas'}`} extra={<Link to={`/cotizaciones/${pedido.id}/resumen`} className="btn btn--sec btn--chico">Resumen ejecutivo</Link>}>
+    <Seccion titulo={`Comparador · ${cotis.length} ${cotis.length === 1 ? 'oferta' : 'ofertas'}`} extra={<AccionesComparador pedido={pedido} cotis={cotis} provs={provs} />}>
       {pedido.estado === 'abierto' && !cerrado(pedido) && <p className="tenue">El pedido sigue abierto hasta el {cuando(pedido)}: pueden llegar más ofertas.</p>}
       <Matriz pedido={pedido} cotis={cotis} provs={provs} asignacion={asignacion} onAsignar={(itemId, pid) => setAsignacion({ ...asignacion, [itemId]: pid })} />
       <div className="adjudicar">
@@ -244,5 +246,15 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
         </div>
       </div>
     </Seccion>
+  );
+}
+
+function AccionesComparador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; cotis: Cotizacion[]; provs: Proveedor[] }) {
+  const empresa = (pid: string) => provs.find((p) => p.id === pid)?.empresa ?? pid;
+  return (
+    <span className="acciones-fila">
+      <button className="btn btn--sec btn--chico" onClick={() => descargar(nombreArchivo(`matriz ${pedido.id} ${pedido.titulo}`), matrizCsv(pedido, cotis, empresa))}>Descargar Excel</button>
+      <Link to={`/cotizaciones/${pedido.id}/resumen`} className="btn btn--sec btn--chico">Resumen ejecutivo</Link>
+    </span>
   );
 }
