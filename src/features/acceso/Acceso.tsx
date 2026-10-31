@@ -122,19 +122,29 @@ function Registro({ rolInicial, alCrear }: { rolInicial: Rol; alCrear: () => voi
   const { auth } = useAuth();
   const [d, setD] = useState<DatosAlta>(() => vacio(rolInicial));
   const [tocado, setTocado] = useState(false);
+  // Dos pasos: primero la empresa, después la persona y la contraseña. Se valida cada paso por separado.
+  const [paso, setPaso] = useState<1 | 2>(1);
+  const [tocado1, setTocado1] = useState(false);
   const [consiento, setConsiento] = useState(false);
   const [ver, setVer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const set = <K extends keyof DatosAlta>(k: K, v: DatosAlta[K]) => setD((x) => ({ ...x, [k]: v }));
   const errores = validarAlta(d);
-  const err = (k: CampoAlta) => (tocado && errores[k] ? <span className="error">{errores[k]}</span> : null);
+  const PASO1: CampoAlta[] = ['empresa', 'categoria', 'ubicacion', 'cuit'];
+  const err = (k: CampoAlta) => ((PASO1.includes(k) ? tocado1 || tocado : tocado) && errores[k] ? <span className="error">{errores[k]}</span> : null);
+  const seguir = () => {
+    setTocado1(true);
+    if (PASO1.some((k) => errores[k])) return;
+    setPaso(2);
+  };
   const esComprador = d.rol === 'comprador';
 
   const crear = async (e: React.FormEvent) => {
     e.preventDefault();
     setTocado(true);
     setError(null);
+    if (PASO1.some((k) => errores[k])) { setTocado1(true); setPaso(1); return; }
     if (Object.keys(errores).length || !consiento || !d.categoria) {
       if (!consiento && !Object.keys(errores).length) setError('Falta tu consentimiento para crear el perfil.');
       return;
@@ -164,57 +174,67 @@ function Registro({ rolInicial, alCrear }: { rolInicial: Rol; alCrear: () => voi
           ? 'Registrá tu empresa para pedir cotizaciones a proveedores verificados de la red.'
           : 'Registrá tu empresa para recibir los pedidos de tu rubro y llegar a quien compra.'}
       </p>
-      <form className="form acceso__form" onSubmit={crear} noValidate>
-        <div className="form__fila">
-          <label className="campo" htmlFor="r-empresa"><span>Nombre de la empresa</span>
-            <input id="r-empresa" autoComplete="organization" placeholder="Ej: Servicios del Sur S.A." value={d.empresa} onChange={(e) => set('empresa', e.target.value)} />{err('empresa')}
-          </label>
-          <label className="campo" htmlFor="r-contacto"><span>Nombre de contacto</span>
-            <input id="r-contacto" autoComplete="name" placeholder="Ej: Juan Pérez" value={d.contactoNombre} onChange={(e) => set('contactoNombre', e.target.value)} />{err('contactoNombre')}
-          </label>
-        </div>
-        <div className="form__fila">
-          <label className="campo" htmlFor="r-email"><span>Email de contacto</span>
-            <input id="r-email" type="email" autoComplete="email" placeholder="nombre@empresa.com.ar" value={d.email} onChange={(e) => set('email', e.target.value)} />
-            {err('email') ?? (esComprador && esMailValido(d.email) && !mailCorporativo(d.email, REGION) && <span className="tenue">Con el mail de la empresa tu perfil muestra “Mail corporativo verificado”.</span>)}
-          </label>
-          <label className="campo" htmlFor="r-tel"><span>Teléfono de contacto</span>
-            <input id="r-tel" type="tel" autoComplete="tel" placeholder="Ej: +54 9 11 1234-5678" value={d.telefono} onChange={(e) => set('telefono', e.target.value)} />{err('telefono')}
-          </label>
-        </div>
-        <div className="form__fila">
-          <label className="campo" htmlFor="r-cat"><span>Categoría</span>
-            <select id="r-cat" value={d.categoria} onChange={(e) => set('categoria', e.target.value as RubroId)}>
-              <option value="" disabled>{esComprador ? 'Qué comprás principalmente' : 'Qué vendés principalmente'}</option>
-              {RUBROS.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-            </select>{err('categoria')}
-          </label>
-          <label className="campo" htmlFor="r-sector"><span>Sector</span>
-            <input id="r-sector" placeholder="Ej: Servicios industriales" value={d.sector} onChange={(e) => set('sector', e.target.value)} />
-          </label>
-        </div>
-        <div className="form__fila">
-          <label className="campo" htmlFor="r-ubic"><span>Ubicación</span>
-            <input id="r-ubic" autoComplete="address-level2" placeholder="Ej: Neuquén, Argentina" value={d.ubicacion} onChange={(e) => set('ubicacion', e.target.value)} />{err('ubicacion')}
-          </label>
-          <label className="campo" htmlFor="r-cuit"><span>{REGION.idFiscal.nombre} de la empresa</span>
-            <input id="r-cuit" inputMode="numeric" className="mono" placeholder={REGION.idFiscal.ejemplo} value={d.cuit} onChange={(e) => set('cuit', formatearCuit(e.target.value))} />
-            {err('cuit') ?? (tocado || d.cuit.length === 13 ? !errores.cuit && <span className="ok">Dígito verificador correcto.</span> : null)}
-          </label>
-        </div>
-        <label className="campo" htmlFor="r-pass"><span>Contraseña</span>
-          <span className="campo__clave">
-            <input id="r-pass" type={ver ? 'text' : 'password'} autoComplete="new-password" value={d.password} onChange={(e) => set('password', e.target.value)} />
-            <button type="button" className="enlace" onClick={() => setVer(!ver)} aria-pressed={ver}>{ver ? 'Ocultar' : 'Mostrar'}</button>
-          </span>
-          {err('password') ?? <span className="tenue">Mínimo {PASSWORD_MIN} caracteres.</span>}
-        </label>
-        <label className="opcion opcion--legal">
-          <input type="checkbox" checked={consiento} onChange={(e) => setConsiento(e.target.checked)} />
-          <span><strong>Doy mi consentimiento</strong>Acepto que {MARCA.nombre} trate mis datos para mostrar el perfil de mi empresa en la red, según la {REGION.leyDatos}. {esComprador ? 'Mi mail y teléfono los ve solo el proveedor cuya solicitud yo acepte.' : 'Los compradores registrados van a ver mi mail y teléfono; los otros proveedores, no.'} Puedo pedir acceso, rectificación o supresión en cualquier momento.</span>
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn btn--pri btn--grande" disabled={enviando}>{enviando ? 'Creando la cuenta…' : 'Crear mi cuenta'}</button>
+      <ol className="pasos-alta" aria-label="Pasos del alta">
+        <li className={paso === 1 ? 'is-activo' : 'is-hecho'}>1. Tu empresa</li>
+        <li className={paso === 2 ? 'is-activo' : ''}>2. Vos y tu contraseña</li>
+      </ol>
+      <form className="form acceso__form" onSubmit={paso === 1 ? (e) => { e.preventDefault(); seguir(); } : crear} noValidate>
+        {paso === 1 && (
+          <>
+            <label className="campo" htmlFor="r-empresa"><span>Nombre de la empresa</span>
+              <input id="r-empresa" autoComplete="organization" placeholder="Ej: Servicios del Sur S.A." value={d.empresa} onChange={(e) => set('empresa', e.target.value)} />{err('empresa')}
+            </label>
+            <label className="campo" htmlFor="r-cuit"><span>{REGION.idFiscal.nombre} de la empresa</span>
+              <input id="r-cuit" inputMode="numeric" className="mono" placeholder={`Ej: ${REGION.idFiscal.ejemplo}`} value={d.cuit} onChange={(e) => set('cuit', formatearCuit(e.target.value))} />
+              {err('cuit') ?? (tocado1 || d.cuit.length === 13 ? !errores.cuit && <span className="ok">Dígito verificador correcto.</span> : null)}
+            </label>
+            <div className="form__fila">
+              <label className="campo" htmlFor="r-cat"><span>{esComprador ? 'Qué comprás principalmente' : 'Qué vendés principalmente'}</span>
+                <select id="r-cat" value={d.categoria} onChange={(e) => set('categoria', e.target.value as RubroId)}>
+                  <option value="" disabled>Elegí un rubro</option>
+                  {RUBROS.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                </select>{err('categoria')}
+              </label>
+              <label className="campo" htmlFor="r-ubic"><span>Ciudad y provincia</span>
+                <input id="r-ubic" autoComplete="address-level2" placeholder="Ej: Neuquén, Neuquén" value={d.ubicacion} onChange={(e) => set('ubicacion', e.target.value)} />{err('ubicacion')}
+              </label>
+            </div>
+            <label className="campo" htmlFor="r-sector"><span>Especialidad (opcional)</span>
+              <input id="r-sector" placeholder={esComprador ? 'Ej: Alimentos, industria láctea' : 'Ej: Envases flexibles para alimentos'} value={d.sector} onChange={(e) => set('sector', e.target.value)} />
+            </label>
+            <button className="btn btn--pri btn--grande">Seguir</button>
+          </>
+        )}
+        {paso === 2 && (
+          <>
+            <p className="tenue">{d.empresa.trim()} · {REGION.idFiscal.nombre} {d.cuit} · <button type="button" className="enlace" onClick={() => setPaso(1)}>Cambiar</button></p>
+            <label className="campo" htmlFor="r-contacto"><span>Tu nombre y apellido</span>
+              <input id="r-contacto" autoComplete="name" placeholder="Ej: Juan Pérez" value={d.contactoNombre} onChange={(e) => set('contactoNombre', e.target.value)} />{err('contactoNombre')}
+            </label>
+            <div className="form__fila">
+              <label className="campo" htmlFor="r-email"><span>Email</span>
+                <input id="r-email" type="email" autoComplete="email" placeholder="nombre@empresa.com.ar" value={d.email} onChange={(e) => set('email', e.target.value)} />
+                {err('email') ?? (esComprador && esMailValido(d.email) && !mailCorporativo(d.email, REGION) && <span className="tenue">Con el mail de la empresa tu perfil muestra “Mail corporativo verificado”.</span>)}
+              </label>
+              <label className="campo" htmlFor="r-tel"><span>Teléfono</span>
+                <input id="r-tel" type="tel" autoComplete="tel" placeholder="Ej: +54 9 11 1234-5678" value={d.telefono} onChange={(e) => set('telefono', e.target.value)} />{err('telefono')}
+              </label>
+            </div>
+            <label className="campo" htmlFor="r-pass"><span>Contraseña</span>
+              <span className="campo__clave">
+                <input id="r-pass" type={ver ? 'text' : 'password'} autoComplete="new-password" value={d.password} onChange={(e) => set('password', e.target.value)} />
+                <button type="button" className="enlace" onClick={() => setVer(!ver)} aria-pressed={ver}>{ver ? 'Ocultar' : 'Mostrar'}</button>
+              </span>
+              {err('password') ?? <span className="tenue">Mínimo {PASSWORD_MIN} caracteres.</span>}
+            </label>
+            <label className="opcion opcion--legal">
+              <input type="checkbox" checked={consiento} onChange={(e) => setConsiento(e.target.checked)} />
+              <span><strong>Doy mi consentimiento</strong>Acepto que {MARCA.nombre} trate mis datos para mostrar el perfil de mi empresa en la red, según la {REGION.leyDatos}. {esComprador ? 'Mi mail y teléfono los ve solo el proveedor cuya solicitud yo acepte.' : 'Los compradores registrados van a ver mi mail y teléfono; los otros proveedores, no.'} Puedo pedir acceso, rectificación o supresión en cualquier momento.</span>
+            </label>
+            {error && <p className="error" role="alert">{error}</p>}
+            <button className="btn btn--pri btn--grande" disabled={enviando}>{enviando ? 'Creando la cuenta…' : 'Crear mi cuenta'}</button>
+          </>
+        )}
       </form>
     </>
   );

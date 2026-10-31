@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useQuery, useRepo } from '@/data/DataProvider';
@@ -15,6 +15,8 @@ import { EditorEnlaces } from './Enlaces';
 interface FilaItem { id: string; nombre: string; descripcion: string; cantidad: string; unidad: string }
 const filaNueva = (n: number, unidad: string): FilaItem => ({ id: `i${n}`, nombre: '', descripcion: '', cantidad: '', unidad });
 const manana = () => new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+/** Una semana es un plazo razonable para cotizar; el comprador lo cambia si quiere. */
+const enUnaSemana = () => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
 /** Formulario completo del pedido: ítems, cierre con hora, privacidad, sobre cerrado, documentos y enlaces. */
 export function NuevoPedido() {
@@ -27,7 +29,7 @@ export function NuevoPedido() {
   const [descripcion, setDescripcion] = useState('');
   const [items, setItems] = useState<FilaItem[]>([filaNueva(1, rubro('packaging').unidad)]);
   const [proximo, setProximo] = useState(2);
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(enUnaSemana);
   const [hora, setHora] = useState(HORA_CIERRE);
   const [entrega, setEntrega] = useState('');
   const [pago, setPago] = useState('60 días fecha factura');
@@ -51,6 +53,7 @@ export function NuevoPedido() {
     yo: (await rp.obtenerPersona(usuarioId)) as Comprador,
     proveedores: await rp.listarProveedores(),
     favoritos: await rp.favoritos(usuarioId),
+    anteriores: rol === 'comprador' ? await rp.listarPedidos({ compradorId: usuarioId, visorId: usuarioId }) : [],
   }), [usuarioId]);
 
   const base = data ? valorDelRubro(data.valores, r, data.yo?.region) : undefined;
@@ -61,6 +64,26 @@ export function NuevoPedido() {
   const candidatos = useMemo(() => (data?.proveedores ?? [])
     .filter((p) => verTodos || p.rubros.includes(r) || favoritos.includes(p.id) || invitados.includes(p.id))
     .sort((a, b) => Number(favoritos.includes(b.id)) - Number(favoritos.includes(a.id))), [data, r, verTodos, favoritos, invitados]);
+  // Repetir un pedido anterior: copia todo menos el cierre, que vuelve a una semana.
+  const [repetido, setRepetido] = useState('');
+  const repetir = (id: string) => {
+    const p = data?.anteriores.find((x) => x.id === id);
+    setRepetido(id);
+    if (!p) return;
+    setR(p.rubro); setTitulo(p.titulo); setDescripcion(p.descripcion);
+    setItems(p.items.map((i, n) => ({ id: `i${n + 1}`, nombre: i.nombre, descripcion: i.descripcion, cantidad: String(i.cantidad), unidad: i.unidad })));
+    setProximo(p.items.length + 1);
+    setEntrega(p.entrega); setPago(p.pago); setZona(p.zona); setMoneda(p.moneda ?? 'ARS'); setSobreCerrado(p.sobreCerrado);
+    setPrivado(p.privado); setInvitados(p.privado ? p.invitados : []); setDocumentos(p.documentos); setAdjuntos(p.adjuntos);
+    setFecha(enUnaSemana()); setHora(HORA_CIERRE);
+    if (p.privado || p.documentos.length || p.adjuntos.length) setMasOpciones(true);
+  };
+  const aRepetir = params.get('repetir');
+  useEffect(() => {
+    if (aRepetir && data && !repetido) repetir(aRepetir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aRepetir, data]);
+  const [masOpciones, setMasOpciones] = useState(preinvitados.length > 0);
   const sumarFavoritos = () => setInvitados([...invitados, ...favoritos.filter((f) => !invitados.includes(f))].slice(0, INVITADOS_MAX));
 
   if (rol !== 'comprador') return <div className="envoltura pagina"><Vacio titulo="Solo los compradores publican pedidos" accion={{ a: '/cotizaciones', texto: 'Ver pedidos' }} /></div>;
@@ -109,6 +132,15 @@ export function NuevoPedido() {
         <p className="tenue">Los proveedores cotizan cada ítem en el mismo formato, así podés compararlos lado a lado.</p>
       </header>
       <form className="form pedido-form" onSubmit={publicar}>
+        {data && data.anteriores.length > 0 && (
+          <label className="campo repetir" htmlFor="np-repetir">
+            <span>¿Ya pediste algo parecido? Repetí un pedido anterior y cambiá solo lo necesario</span>
+            <select id="np-repetir" value={repetido} onChange={(e) => repetir(e.target.value)}>
+              <option value="">Empezar de cero</option>
+              {data.anteriores.map((p) => <option key={p.id} value={p.id}>{p.id} · {p.titulo}</option>)}
+            </select>
+          </label>
+        )}
         <Seccion titulo="1. El pedido">
           <div className="form__fila">
             <label className="campo" htmlFor="np-rubro">
@@ -169,6 +201,11 @@ export function NuevoPedido() {
           </label>
         </Seccion>
 
+        <details className="mas-opciones" open={masOpciones} onToggle={(e) => setMasOpciones((e.target as HTMLDetailsElement).open)}>
+          <summary>
+            <strong>Más opciones</strong>
+            <span className="tenue"> · {privado ? `Privado, ${invitados.length} ${invitados.length === 1 ? 'invitado' : 'invitados'}` : 'Público'} · {documentos.length ? `${documentos.length} ${documentos.length === 1 ? 'documento' : 'documentos'}` : 'sin documentos'}{adjuntos.length ? ` · ${adjuntos.length} ${adjuntos.length === 1 ? 'archivo' : 'archivos'}` : ''}</span>
+          </summary>
         <Seccion titulo="4. Quiénes cotizan">
           <div className="opciones-fila" role="radiogroup" aria-label="Privacidad del pedido">
             <label className="opcion"><input type="radio" name="privacidad" checked={!privado} onChange={() => setPrivado(false)} /><span><strong>Público</strong>Lo recibe y lo puede cotizar cualquier proveedor verificado de {rubro(r).nombre.toLowerCase()}.</span></label>
@@ -211,6 +248,7 @@ export function NuevoPedido() {
           <EditorEnlaces id="np-adj" valor={adjuntos} onCambio={setAdjuntos} ayuda="Planos, pliegos o normativas. Subilos a Drive o Dropbox, compartilos con enlace y pegalo acá." />
         </Seccion>
 
+        </details>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="form__acciones">
           <Link to="/cotizaciones" className="btn btn--ter">Cancelar</Link>
