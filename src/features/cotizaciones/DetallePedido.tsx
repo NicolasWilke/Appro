@@ -72,6 +72,7 @@ export function DetallePedido() {
           {pedido.estado === 'adjudicado' ? <Pill tono="ok">{t.estado.adjudicado}</Pill>
             : abierto ? <Pill tono="senal">Recibe ofertas hasta el {cuando(pedido)}</Pill>
             : <Pill tono="sello">Cerrado · en evaluación</Pill>}
+          {esDueno && <p><Link to={`/cotizaciones/nuevo?repetir=${pedido.id}`} className="enlace">Repetir este pedido</Link></p>}
         </div>
       </header>
       {pedido.descripcion && <p className="pedido__desc">{pedido.descripcion}</p>}

@@ -9,17 +9,18 @@ import { Avatar, Chip, Pill, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
 import { ContactoPersona } from '../red/ContactoPersona';
 import { TarjetaProveedor } from '../red/TarjetaProveedor';
+import { PrimerosPasos } from './PrimerosPasos';
 
 export function PanelComprador() {
   const { usuarioId } = useSesion();
   const { data } = useQuery(async (r) => {
     const yo = (await r.obtenerPersona(usuarioId)) as Comprador;
-    const [sols, provs, pedidos] = await Promise.all([r.solicitudesRecibidas(usuarioId), r.listarProveedores(), r.listarPedidos({ compradorId: usuarioId, visorId: usuarioId })]);
-    return { yo, sols, provs, pedidos: pedidos.map((p) => ({ p, n: p.ofertas })) };
+    const [sols, provs, pedidos, favoritos] = await Promise.all([r.solicitudesRecibidas(usuarioId), r.listarProveedores(), r.listarPedidos({ compradorId: usuarioId, visorId: usuarioId }), r.favoritos(usuarioId)]);
+    return { yo, sols, provs, favoritos, pedidos: pedidos.map((p) => ({ p, n: p.ofertas })) };
   }, [usuarioId]);
   if (!data) return <div className="envoltura pagina" />;
 
-  const { yo, sols, provs, pedidos } = data;
+  const { yo, sols, provs, pedidos, favoritos } = data;
   const prov = (id: string) => provs.find((p) => p.id === id)!;
   const pendientes = sols.filter((s) => s.estado === 'pendiente');
   const postergadas = sols.filter((s) => s.estado === 'postergada');
@@ -36,6 +37,12 @@ export function PanelComprador() {
         </div>
         <Link to="/cotizaciones/nuevo" className="btn btn--pri btn--grande">Nuevo pedido de cotización</Link>
       </header>
+
+      <PrimerosPasos usuarioId={usuarioId} pasos={[
+        { hecho: !!yo.logo, texto: 'Subí el logo de tu empresa: los proveedores confían más en un perfil completo.', a: '/perfil', accion: 'Ir a mi perfil' },
+        { hecho: pedidos.length > 0, texto: 'Publicá tu primer pedido de cotización.', a: '/cotizaciones/nuevo', accion: 'Publicar' },
+        { hecho: favoritos.length > 0, texto: 'Guardá como favorito un proveedor del directorio para invitarlo a tus pedidos.', a: '/red', accion: 'Ver proveedores' },
+      ]} />
 
       <div className="panel__grilla">
         <div className="panel__col">

@@ -16,6 +16,7 @@ import { PedirContacto } from '../red/PedirContacto';
 import { TarjetaComprador } from '../red/TarjetaProveedor';
 import { ContactoPersona } from '../red/ContactoPersona';
 import { PedidosDeValor } from '../recientes/PedidosDeValor';
+import { PrimerosPasos } from './PrimerosPasos';
 
 const TONO: Record<string, TonoPill> = { pendiente: 'senal', aceptada: 'ok', postergada: 'neutro', cerrada: 'neutro' };
 
@@ -69,6 +70,12 @@ export function PanelProveedor() {
         </div>
       </header>
 
+      <PrimerosPasos usuarioId={usuarioId} pasos={[
+        { hecho: !!yo.logo, texto: 'Subí el logo de tu empresa: es lo primero que ve el comprador.', a: '/perfil', accion: 'Ir a mi perfil' },
+        { hecho: cotizados.size > 0 || uso.respuestasUsadas > 0, texto: 'Cotizá tu primer pedido.', a: '/cotizaciones', accion: 'Ver pedidos' },
+        { hecho: enviadas.length > 0, texto: 'Pedile contacto a un comprador con ventana de compra abierta.', a: '/red', accion: 'Ver compradores' },
+      ]} />
+
       <Seccion titulo={`Para cotizar · ${paraCotizar.length}`} extra={<Link to="/cotizaciones" className="enlace">{yaCotizados > 0 ? `Ver todos (ya cotizaste ${yaCotizados})` : 'Ver todos'}</Link>}>
         {paraCotizar.length === 0 && (
           <Vacio titulo={abiertos.length ? 'Cotizaste todos los pedidos abiertos de tus rubros' : 'No hay pedidos abiertos en tus rubros'}>
@@ -120,6 +127,7 @@ export function PanelProveedor() {
             </div>
           </Seccion>
           <Seccion titulo="Tus solicitudes">
+            {enviadas.length === 0 && <p className="tenue">Todavía no pediste contacto a ningún comprador. Cuando lo hagas, acá ves si te aceptó y sus datos.</p>}
             {enviadas.map((s) => {
               const c = comp(s.compradorId);
               const est = estadoVisibleParaProveedor(s.estado);
