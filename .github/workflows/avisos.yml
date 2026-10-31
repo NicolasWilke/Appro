@@ -23,6 +23,10 @@ on:
         description: 'Mandar el resumen diario en vez de los avisos inmediatos'
         type: boolean
         default: false
+      prueba_a:
+        description: 'Solo mandar un mail de prueba a esta dirección (no toca la base)'
+        type: string
+        default: ''
 
 concurrency:
   group: avisos
@@ -45,7 +49,9 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Mandar avisos
         run: |
-          if [ "${{ github.event.schedule }}" = "13 11 * * *" ] || [ "${{ inputs.resumen }}" = "true" ]; then
+          if [ -n "${{ inputs.prueba_a }}" ]; then
+            MAIL_PRUEBA_A="${{ inputs.prueba_a }}" npm run mail:prueba
+          elif [ "${{ github.event.schedule }}" = "13 11 * * *" ] || [ "${{ inputs.resumen }}" = "true" ]; then
             npm run avisos -- --resumen
           else
             npm run avisos
