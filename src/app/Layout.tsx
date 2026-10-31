@@ -43,6 +43,34 @@ function navDe(rol: Rol | undefined): Item[] {
   ];
 }
 
+type Enlace = { a: string; texto: string };
+
+/** Columnas del pie: solo páginas que existen; cambian según haya sesión y rol. */
+function columnasPie(rol: Rol | undefined): { titulo: string; enlaces: Enlace[] }[] {
+  const producto: Enlace[] = [{ a: '/', texto: t.nav.inicio }, { a: '/planes', texto: t.nav.planes }];
+  const legal = { titulo: 'Legal', enlaces: [{ a: '/terminos', texto: 'Términos y condiciones' }, { a: '/privacidad', texto: 'Política de privacidad' }] };
+  if (!rol) return [
+    { titulo: 'Producto', enlaces: producto },
+    { titulo: 'Empezá', enlaces: [
+      { a: '/ingresar?modo=registro&rol=comprador', texto: 'Quiero comprar' },
+      { a: '/ingresar?modo=registro&rol=proveedor', texto: 'Quiero vender' },
+      { a: '/ingresar', texto: 'Iniciar sesión' },
+    ] },
+    legal,
+  ];
+  return [
+    { titulo: 'Producto', enlaces: producto },
+    { titulo: 'Tu cuenta', enlaces: [
+      { a: '/panel', texto: 'Panel' },
+      rol === 'comprador' ? { a: '/cotizaciones/nuevo', texto: 'Nuevo pedido' } : { a: '/cotizaciones', texto: 'Para cotizar' },
+      { a: '/red', texto: rol === 'comprador' ? 'Proveedores' : 'Compradores' },
+      { a: '/perfil', texto: 'Mi perfil' },
+    ] },
+    { titulo: 'Referencias', enlaces: REFERENCIAS.filter((r) => !r.rol || r.rol === rol) },
+    legal,
+  ];
+}
+
 const iniciales = (empresa: string) => empresa.split(/\s+/).filter((w) => /^[A-ZÁÉÍÓÚÑ]/i.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
 
 export function Layout() {
@@ -121,12 +149,27 @@ export function Layout() {
         </nav>
       )}
       <footer className="pie">
-        <div className="envoltura pie__in">
-          <div>
-            <p><strong>{t.marca}</strong> · {t.bajada} · {REGION.pais}</p>
-            <p className="tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
+        <div className="envoltura">
+          <div className="pie__grilla">
+            <div className="pie__marca">
+              <NavLink to="/" className="marca" aria-label={`${t.marca}, inicio`}>
+                <img className="marca__logo" src={MARCA.logo} alt="" width={36} height={36} />
+                <img className="marca__nombre" src={MARCA.wordmark} alt={t.marca} width={109} height={26} />
+              </NavLink>
+              <p>La red B2B de {REGION.pais} donde compradores y proveedores verificados piden, comparan y adjudican cotizaciones en un solo lugar.</p>
+            </div>
+            {columnasPie(rol).map((c) => (
+              <nav key={c.titulo} className="pie__col" aria-label={c.titulo}>
+                <h2 className="pie__titulo">{c.titulo}</h2>
+                <ul>{c.enlaces.map((e) => <li key={e.a}><NavLink to={e.a} className="pie__link">{e.texto}</NavLink></li>)}</ul>
+              </nav>
+            ))}
           </div>
-          <p className="tenue mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</p>
+          <p className="pie__datos tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
+          <div className="pie__base tenue">
+            <span>© {new Date().getFullYear()} {t.marca}. {MARCA.lema}{MARCA.contacto && <> · <a className="pie__link" href={`mailto:${MARCA.contacto}`}>{MARCA.contacto}</a></>}</span>
+            <span className="mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</span>
+          </div>
         </div>
       </footer>
     </div>
