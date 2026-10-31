@@ -1,7 +1,7 @@
 # Avisos por mail sin Cloud Functions (plan Spark).
 # En un repositorio privado, GitHub da 2.000 minutos gratis por mes: cada 30 minutos son unos 1.500. Más seguido se pasa del cupo.
 # Cada 30 minutos manda los avisos de pedidos nuevos y las alertas por hito (ofertas nuevas, cierre en 24 h, cierre,
-# consultas respondidas, adjudicación a ganadores y no seleccionados, pedidos de valor). Todos los días a las 8:00
+# consultas respondidas, adjudicación a ganadores y no seleccionados, pedidos de valor). Todos los días a las 8:13
 # (Argentina) manda el resumen diario.
 # Secretos del repositorio (Settings → Secrets and variables → Actions):
 #   FIREBASE_SERVICE_ACCOUNT  contenido completo del JSON de la cuenta de servicio
@@ -13,15 +13,20 @@ name: Avisos por mail
 
 on:
   # Si un mail no sale, la corrida queda en rojo y GitHub te avisa por mail.
+  # Minutos 7 y 37 a propósito: GitHub demora o saltea las programaciones en punto (:00 y :30), que es cuando más carga tiene.
   schedule:
-    - cron: '*/30 * * * *'
-    - cron: '0 11 * * *'
+    - cron: '7,37 * * * *'
+    - cron: '13 11 * * *'
   workflow_dispatch:
     inputs:
       resumen:
         description: 'Mandar el resumen diario en vez de los avisos inmediatos'
         type: boolean
         default: false
+      prueba_a:
+        description: 'Solo mandar un mail de prueba a esta dirección (no toca la base)'
+        type: string
+        default: ''
 
 concurrency:
   group: avisos
@@ -44,7 +49,9 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Mandar avisos
         run: |
-          if [ "${{ github.event.schedule }}" = "0 11 * * *" ] || [ "${{ inputs.resumen }}" = "true" ]; then
+          if [ -n "${{ inputs.prueba_a }}" ]; then
+            MAIL_PRUEBA_A="${{ inputs.prueba_a }}" npm run mail:prueba
+          elif [ "${{ github.event.schedule }}" = "13 11 * * *" ] || [ "${{ inputs.resumen }}" = "true" ]; then
             npm run avisos -- --resumen
           else
             npm run avisos
