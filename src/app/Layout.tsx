@@ -48,6 +48,7 @@ type Enlace = { a: string; texto: string };
 /** Columnas del pie: solo páginas que existen; cambian según haya sesión y rol. */
 function columnasPie(rol: Rol | undefined): { titulo: string; enlaces: Enlace[] }[] {
   const producto: Enlace[] = [{ a: '/', texto: t.nav.inicio }, { a: '/planes', texto: t.nav.planes }];
+  const legal = { titulo: 'Legal', enlaces: [{ a: '/terminos', texto: 'Términos y condiciones' }, { a: '/privacidad', texto: 'Política de privacidad' }] };
   if (!rol) return [
     { titulo: 'Producto', enlaces: producto },
     { titulo: 'Empezá', enlaces: [
@@ -55,6 +56,7 @@ function columnasPie(rol: Rol | undefined): { titulo: string; enlaces: Enlace[] 
       { a: '/ingresar?modo=registro&rol=proveedor', texto: 'Quiero vender' },
       { a: '/ingresar', texto: 'Iniciar sesión' },
     ] },
+    legal,
   ];
   return [
     { titulo: 'Producto', enlaces: producto },
@@ -65,6 +67,7 @@ function columnasPie(rol: Rol | undefined): { titulo: string; enlaces: Enlace[] 
       { a: '/perfil', texto: 'Mi perfil' },
     ] },
     { titulo: 'Referencias', enlaces: REFERENCIAS.filter((r) => !r.rol || r.rol === rol) },
+    legal,
   ];
 }
 
@@ -164,7 +167,7 @@ export function Layout() {
           </div>
           <p className="pie__datos tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
           <div className="pie__base tenue">
-            <span>© {new Date().getFullYear()} {t.marca}. {MARCA.lema}</span>
+            <span>© {new Date().getFullYear()} {t.marca}. {MARCA.lema}{MARCA.contacto && <> · <a className="pie__link" href={`mailto:${MARCA.contacto}`}>{MARCA.contacto}</a></>}</span>
             <span className="mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</span>
           </div>
         </div>

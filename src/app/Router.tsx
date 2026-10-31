@@ -1,4 +1,5 @@
 import { EditarValores } from '@/features/admin/EditarValores';
+import { Privacidad, Terminos } from '@/features/legal/Legal';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Landing } from '@/features/landing/Landing';
 import { Acceso } from '@/features/acceso/Acceso';
@@ -33,6 +34,8 @@ const rutas = (
     <Route path="ingresar" element={<Acceso />} />
     <Route path="registro" element={<RedirigirRegistro />} />
     <Route path="planes" element={<Planes />} />
+    <Route path="terminos" element={<Terminos />} />
+    <Route path="privacidad" element={<Privacidad />} />
     <Route element={<RequiereSesion />}>
       <Route path="perfil" element={<MiPerfil />} />
       <Route path="panel" element={<Panel />} />
