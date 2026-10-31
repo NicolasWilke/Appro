@@ -155,7 +155,7 @@ function Registro({ rolInicial, alCrear }: { rolInicial: Rol; alCrear: () => voi
       <div className="segmento segmento--ancho" role="group" aria-label="Tipo de cuenta">
         {(['comprador', 'proveedor'] as const).map((r) => (
           <button key={r} type="button" aria-pressed={d.rol === r} className={d.rol === r ? 'is-activo' : ''} onClick={() => set('rol', r)}>
-            {r === 'comprador' ? 'Soy una empresa' : 'Soy un proveedor'}
+            {r === 'comprador' ? 'Quiero comprar' : 'Quiero vender'}
           </button>
         ))}
       </div>

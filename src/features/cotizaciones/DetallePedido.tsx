@@ -1,6 +1,6 @@
 import { monedaDe } from '@/domain/moneda';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useQuery, useRepo } from '@/data/DataProvider';
 import { rubro } from '@/domain/catalogos';
@@ -26,6 +26,9 @@ export function DetallePedido() {
   const { id = '' } = useParams();
   const { rol, usuarioId } = useSesion();
   const [cotizando, setCotizando] = useState(false);
+  // Desde el panel se llega con ?cotizar=1: si todavía se puede cotizar, el formulario se abre solo.
+  const [params, setParams] = useSearchParams();
+  const quiereCotizar = params.get('cotizar') === '1';
   const { data, cargando } = useQuery(async (r) => {
     const pedido = await r.obtenerPedido(id);
     if (!pedido) return null;
@@ -37,6 +40,13 @@ export function DetallePedido() {
     ]);
     return { pedido, cotis, provs, comprador, avisos, resenas };
   }, [id, usuarioId]);
+
+  const listoParaCotizar = !!data && rol === 'proveedor' && recibeOfertas(data.pedido) && !data.cotis.some((c) => c.proveedorId === usuarioId);
+  useEffect(() => {
+    if (!quiereCotizar || cargando) return;
+    if (listoParaCotizar) setCotizando(true);
+    setParams({}, { replace: true });
+  }, [quiereCotizar, cargando, listoParaCotizar, setParams]);
 
   if (cargando) return <div className="envoltura pagina" />;
   if (!data) return <div className="envoltura pagina"><Vacio titulo="Este pedido no existe o es privado" accion={{ a: '/cotizaciones', texto: 'Ver pedidos' }} /></div>;

@@ -136,7 +136,7 @@ export function NuevoPedido() {
               </li>
             ))}
           </ol>
-          {valor && moneda === 'ARS' && (
+          {valor && moneda === 'ARS' && tieneValor(valor) && (
             <div className="referencia">
               <p className="referencia__tit"><span className="etq">Valor de referencia</span> {valor.concepto}, por {valor.unidad}</p>
               <RangoValor v={valor} compacto />
