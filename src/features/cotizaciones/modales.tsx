@@ -72,7 +72,7 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
                 <tr key={i.id}>
                   <td><span className="tabla__tit">{i.nombre}</span>{i.descripcion && <span className="tenue bloque-linea">{i.descripcion}</span>}</td>
                   <td className="num mono">{fmt.numero(i.cantidad)} <span className="tenue">{i.unidad}</span></td>
-                  <td className="num"><input aria-label={`Precio unitario de ${i.nombre}`} inputMode="decimal" className="mono entrada-num" value={precios[i.id].precio} onChange={(e) => set(i.id, 'precio', e.target.value)} placeholder={ref ? fmt.numero(ref.actual) : '0'} /></td>
+                  <td className="num"><input aria-label={`Precio unitario de ${i.nombre}`} inputMode="decimal" className="mono entrada-num" value={precios[i.id].precio} onChange={(e) => set(i.id, 'precio', e.target.value)} placeholder="Precio" /></td>
                   <td className="num"><input aria-label={`Descuento de ${i.nombre}`} inputMode="decimal" className="mono entrada-num entrada-num--chica" value={precios[i.id].descuento} onChange={(e) => set(i.id, 'descuento', e.target.value)} /></td>
                   <td><select className="entrada-iva" aria-label={`IVA de ${i.nombre}`} value={precios[i.id].iva} onChange={(e) => set(i.id, 'iva', e.target.value)}>{IVAS.map((x) => <option key={x} value={x}>{fmt.numero(x)} %</option>)}</select></td>
                   <td className="num mono">{lineas[n] ? fmt.importe(lineas[n]!.neto, mon) : '—'}</td>
@@ -87,6 +87,7 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
           </table>
         </div>
         {mon === 'USD' && <p className="nota">Este pedido se cotiza en <strong>dólares</strong>.{neto > 0 && <> <Equivalente monto={neto + iva} moneda="USD" tc={dolar} /></>}{!dolar && ' El equivalente en pesos aparece cuando carga el dólar del día.'}</p>}
+        {ref && !lineas[0] && <p className="nota">Referencia del índice para este rubro: mediana de <strong className="mono">{fmt.moneda(ref.actual)}</strong> por unidad. Es orientativa: poné tu precio real.</p>}
         {ref && lineas[0] && (
           <p className="nota">Mediana del índice: <strong className="mono">{fmt.moneda(ref.actual)}</strong>. Tu precio neto queda <LecturaIndice desvio={desvioVsIndice(lineas[0].unitarioNeto, ref.actual)} /></p>
         )}

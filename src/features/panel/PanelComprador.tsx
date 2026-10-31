@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useResponderSolicitud } from '@/auth/AuthProvider';
 import { useQuery } from '@/data/DataProvider';
-import type { Comprador, Proveedor, SolicitudContacto } from '@/domain/types';
+import type { Comprador, PedidoCotizacion, Proveedor, SolicitudContacto } from '@/domain/types';
+import { recibeOfertas } from '@/domain/rfq';
 import { fmt, t } from '@/i18n';
 import { Avatar, Chip, Pill, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
@@ -33,14 +34,21 @@ export function PanelComprador() {
           <p className="eyebrow">Panel de comprador · {yo.empresa}</p>
           <h1>Hola, {yo.nombre}</h1>
         </div>
-        <div className="filtrado">
-          <span className="filtrado__n mono">23</span>
-          <span>mensajes filtramos por vos esta semana. Solo te llegan solicitudes con motivo, de proveedores verificados y dentro de su cupo.</span>
-        </div>
+        <Link to="/cotizaciones/nuevo" className="btn btn--pri btn--grande">Nuevo pedido de cotización</Link>
       </header>
 
       <div className="panel__grilla">
         <div className="panel__col">
+          <Seccion titulo="Tus pedidos de cotización" extra={<Link to="/cotizaciones" className="enlace">Ver todos</Link>}>
+            {pedidos.length === 0 && <Vacio titulo="Todavía no publicaste pedidos" accion={{ a: '/cotizaciones/nuevo', texto: 'Publicar el primero' }}>Contá qué necesitás y recibí ofertas comparables ítem por ítem.</Vacio>}
+            {[...pedidos].sort((a, b) => orden(a.p) - orden(b.p) || a.p.cierraEn.localeCompare(b.p.cierraEn)).map(({ p, n }) => (
+              <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
+                <span className="mono tenue">{p.id}</span>
+                <span>{p.titulo}</span>
+                <EstadoPedido p={p} n={n} />
+              </Link>
+            ))}
+          </Seccion>
           <Seccion titulo={`Solicitudes de contacto · ${pendientes.length} por responder`}>
             {pendientes.length === 0 && <Vacio titulo="No tenés solicitudes pendientes">Las nuevas llegan en tu resumen del lunes.</Vacio>}
             {pendientes.map((s) => <Solicitud key={s.id} s={s} p={prov(s.proveedorId)} />)}
@@ -51,15 +59,6 @@ export function PanelComprador() {
               {postergadas.map((s) => <Solicitud key={s.id} s={s} p={prov(s.proveedorId)} />)}
             </Seccion>
           )}
-          <Seccion titulo="Tus pedidos de cotización" extra={<Link to="/cotizaciones" className="enlace">Ver todos</Link>}>
-            {pedidos.map(({ p, n }) => (
-              <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
-                <span className="mono tenue">{p.id}</span>
-                <span>{p.titulo}</span>
-                <span>{p.estado === 'adjudicado' ? <Pill tono="ok">{t.estado.adjudicado}</Pill> : <Pill tono={n ? 'sello' : 'neutro'}>{n} {n === 1 ? 'oferta' : 'ofertas'}</Pill>}</span>
-              </Link>
-            ))}
-          </Seccion>
         </div>
         <div className="panel__col">
           <Seccion titulo="Canal directo">
@@ -87,6 +86,17 @@ export function PanelComprador() {
       </div>
     </div>
   );
+}
+
+/** Lo que hay que mirar primero: cerrados sin adjudicar, después abiertos, al final adjudicados. */
+function orden(p: PedidoCotizacion) { return p.estado === 'adjudicado' ? 2 : recibeOfertas(p) ? 1 : 0; }
+
+function EstadoPedido({ p, n }: { p: PedidoCotizacion; n: number }) {
+  const ofertas = `${n} ${n === 1 ? 'oferta' : 'ofertas'}`;
+  if (p.estado === 'adjudicado') return <Pill tono="ok">{t.estado.adjudicado}</Pill>;
+  if (!recibeOfertas(p)) return <Pill tono={n ? 'senal' : 'neutro'}>{n ? `Cerró · ${ofertas} para evaluar` : 'Cerró sin ofertas'}</Pill>;
+  const dias = fmt.diasHasta(p.cierre);
+  return <Pill tono={n ? 'sello' : 'neutro'}>{dias <= 0 ? 'Cierra hoy' : `Cierra en ${dias} ${dias === 1 ? 'día' : 'días'}`} · {ofertas}</Pill>;
 }
 
 function Solicitud({ s, p }: { s: SolicitudContacto; p: Proveedor }) {

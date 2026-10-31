@@ -30,11 +30,17 @@ export function PanelProveedor() {
     const [uso, embudo, enviadas, compradores, pedidos] = await Promise.all([
       r.uso(usuarioId), r.embudo(usuarioId), r.solicitudesEnviadas(usuarioId), r.listarCompradores(), r.listarPedidos({ rubros: yo.rubros, visorId: usuarioId }),
     ]);
-    return { yo, uso, embudo, enviadas, compradores, pedidos };
+    // En cuáles ya cotizó: cada proveedor solo puede leer su propia oferta.
+    const mias = await Promise.all(pedidos.filter((p) => recibeOfertas(p)).map(async (p) => ((await r.cotizacionesDe(p.id)).some((c) => c.proveedorId === usuarioId) ? p.id : null)));
+    return { yo, uso, embudo, enviadas, compradores, pedidos, cotizados: new Set(mias.filter(Boolean) as string[]) };
   }, [usuarioId]);
   if (!data) return <div className="envoltura pagina" />;
 
-  const { yo, uso, embudo, enviadas, compradores, pedidos } = data;
+  const { yo, uso, embudo, enviadas, compradores, pedidos, cotizados } = data;
+  // Lo que le da trabajo al proveedor va primero: abiertos sin cotizar, el que cierra antes arriba.
+  const abiertos = pedidos.filter((p) => recibeOfertas(p)).sort((a, b) => a.cierraEn.localeCompare(b.cierraEn));
+  const paraCotizar = abiertos.filter((p) => !cotizados.has(p.id));
+  const yaCotizados = abiertos.length - paraCotizar.length;
   const plan = PLANES[yo.plan];
   const comp = (id: string) => compradores.find((c) => c.id === id)!;
   const contactados = new Set(enviadas.filter((s) => s.estado !== 'rechazada').map((s) => s.compradorId));
@@ -63,22 +69,27 @@ export function PanelProveedor() {
         </div>
       </header>
 
-      <Seccion titulo="Tu embudo · últimos 90 días" extra={plan.analitica ? <Pill tono={tasa >= 60 ? 'ok' : 'senal'}>{tasa}% de aceptación</Pill> : undefined}>
-        <div className={`embudo ${plan.analitica ? '' : 'is-bloqueado'}`}>
-          {etapas.map((e) => (
-            <div key={e.k} className="embudo__etapa">
-              <span className="embudo__v mono">{fmt.numero(e.v)}</span>
-              <span className="embudo__barra"><span style={{ width: `${Math.max(4, (e.v / etapas[0].v) * 100)}%` }} /></span>
-              <span className="embudo__k">{e.k}</span>
+      <Seccion titulo={`Para cotizar · ${paraCotizar.length}`} extra={<Link to="/cotizaciones" className="enlace">{yaCotizados > 0 ? `Ver todos (ya cotizaste ${yaCotizados})` : 'Ver todos'}</Link>}>
+        {paraCotizar.length === 0 && (
+          <Vacio titulo={abiertos.length ? 'Cotizaste todos los pedidos abiertos de tus rubros' : 'No hay pedidos abiertos en tus rubros'}>
+            Te avisamos por mail cuando se publique uno nuevo o cuando un comprador te invite.
+          </Vacio>
+        )}
+        {paraCotizar.map((p) => {
+          const dias = fmt.diasHasta(p.cierre);
+          return (
+            <div key={p.id} className="fila-cotizar">
+              <Link to={`/cotizaciones/${p.id}`} className="fila-cotizar__txt">
+                <span className="mono tenue">{p.id}</span> <strong>{p.titulo}</strong>
+                <span className="tenue bloque-linea">
+                  {p.items.length > 1 ? `${p.items.length} ítems` : `${fmt.numero(p.cantidad)} ${p.unidad}`} · {p.zona || 'Sin zona'}{p.moneda === 'USD' && ' · en dólares'}{p.privado && ' · invitación'}
+                </span>
+              </Link>
+              <Pill tono={dias <= 2 ? 'senal' : 'neutro'}>{dias <= 0 ? 'Cierra hoy' : dias === 1 ? 'Cierra mañana' : `Cierra en ${dias} días`}</Pill>
+              <Link to={`/cotizaciones/${p.id}?cotizar=1`} className="btn btn--pri btn--chico">Cotizar</Link>
             </div>
-          ))}
-          {!plan.analitica && (
-            <div className="embudo__candado">
-              <p><strong>La analítica del embudo está en Pro y Empresa.</strong> Medí cuántas solicitudes se convierten en reuniones y en ventas.</p>
-              <Link to="/planes" className="btn btn--pri btn--chico">Ver planes</Link>
-            </div>
-          )}
-        </div>
+          );
+        })}
       </Seccion>
 
       <div className="panel__grilla">
@@ -93,15 +104,6 @@ export function PanelProveedor() {
                 </div>
               ))}
             </div>
-          </Seccion>
-          <Seccion titulo="Pedidos de cotización de tus rubros" extra={<Link to="/cotizaciones" className="enlace">Ver todos</Link>}>
-            {pedidos.filter((p) => recibeOfertas(p)).map((p) => (
-              <Link key={p.id} to={`/cotizaciones/${p.id}`} className="fila-pedido">
-                <span className="mono tenue">{p.id}</span>
-                <span>{p.titulo}</span>
-                <span className="tenue">Cierra {fmt.fecha(p.cierre)}</span>
-              </Link>
-            ))}
           </Seccion>
         </div>
         <div className="panel__col">
@@ -144,6 +146,24 @@ export function PanelProveedor() {
           </Seccion>
         </div>
       </div>
+      <Seccion titulo="Tu embudo · últimos 90 días" extra={plan.analitica ? <Pill tono={tasa >= 60 ? 'ok' : 'senal'}>{tasa}% de aceptación</Pill> : undefined}>
+        <div className={`embudo ${plan.analitica ? '' : 'is-bloqueado'}`}>
+          {etapas.map((e) => (
+            <div key={e.k} className="embudo__etapa">
+              <span className="embudo__v mono">{fmt.numero(e.v)}</span>
+              <span className="embudo__barra"><span style={{ width: `${Math.max(4, (e.v / etapas[0].v) * 100)}%` }} /></span>
+              <span className="embudo__k">{e.k}</span>
+            </div>
+          ))}
+          {!plan.analitica && (
+            <div className="embudo__candado">
+              <p><strong>La analítica del embudo está en Pro y Empresa.</strong> Medí cuántas solicitudes se convierten en reuniones y en ventas.</p>
+              <Link to="/planes" className="btn btn--pri btn--chico">Ver planes</Link>
+            </div>
+          )}
+        </div>
+      </Seccion>
+
       {contactar && <PedirContacto comprador={contactar} proveedorId={usuarioId} onCerrar={() => setContactar(null)} />}
     </div>
   );
