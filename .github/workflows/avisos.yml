@@ -12,11 +12,10 @@
 name: Avisos por mail
 
 on:
-  # Apagado hasta cargar los secretos de abajo: sin ellos fallaría cada 30 minutos.
-  # Para encenderlo, borrá los # de las tres líneas siguientes.
-  # schedule:
-  #   - cron: '*/30 * * * *'
-  #   - cron: '0 11 * * *'
+  # Si un mail no sale, la corrida queda en rojo y GitHub te avisa por mail.
+  schedule:
+    - cron: '*/30 * * * *'
+    - cron: '0 11 * * *'
   workflow_dispatch:
     inputs:
       resumen:
