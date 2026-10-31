@@ -67,8 +67,16 @@ a:hover { color: var(--sello-hover); }
 
 .principal { min-height: 60vh; }
 .pie { border-top: 1px solid var(--linea); margin-top: 4rem; background: var(--superficie); font-size: var(--t-s); }
-.pie__in { display: flex; justify-content: space-between; gap: 2rem; padding-block: 1.75rem; flex-wrap: wrap; }
-.pie__in > div { max-width: 640px; display: grid; gap: 0.35rem; }
+.pie__grilla { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: 2rem; padding-block: 2.5rem 1.75rem; }
+.pie__marca { display: grid; gap: 0.8rem; align-content: start; max-width: 360px; }
+.pie__marca p { margin: 0; color: var(--tenue); }
+.pie__titulo { margin: 0 0 0.75rem; font: 600 var(--t-xs)/1.2 var(--f-texto); letter-spacing: 0.1em; text-transform: uppercase; color: var(--tenue); }
+.pie__col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.pie__link { color: var(--tinta); text-decoration: none; }
+.pie__link:hover { color: var(--sello); text-decoration: underline; }
+.pie__datos { margin: 0; padding-bottom: 1.25rem; font-size: var(--t-xs); max-width: 720px; }
+.pie__base { display: flex; justify-content: space-between; gap: 0.5rem 2rem; flex-wrap: wrap; border-top: 1px solid var(--linea); padding-block: 1.1rem 1.5rem; font-size: var(--t-xs); }
+@media (max-width: 860px) { .pie__grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pie__marca { grid-column: 1 / -1; } }
 
 /* Sello: la marca de verificación entintada */
 .sello { display: inline-block; font: 600 0.6875rem/1.25 var(--f-mono); letter-spacing: 0.14em; text-transform: uppercase; text-align: center; color: var(--sello); border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 3px; padding: 0.45rem 0.7rem; border-radius: 6px; transform: rotate(-9deg); opacity: 0.86; mix-blend-mode: multiply; }
