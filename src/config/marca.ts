@@ -10,8 +10,8 @@ export const MARCA = {
   /** El lema en dos renglones, como va debajo del nombre en la cabecera. */
   lemaRenglones: ['Conectando empresas.', 'Generando negocios.'],
   /** Quién opera Proveo y adónde escribir. Se muestran en Términos, Privacidad y el pie; null = todavía sin definir. */
-  operador: null as string | null,
-  contacto: null as string | null,
+  operador: 'Nicolás Wilke' as string | null,
+  contacto: 'ayuda@proveo.com.ar' as string | null,
   logo,
   wordmark,
   // Paleta de la hoja de marca. Texto azul sobre blanco usa `azulTexto` (contraste AA).
