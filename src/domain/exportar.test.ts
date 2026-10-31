@@ -31,19 +31,27 @@ describe('exportar a Excel', () => {
     const ls = lineas(matrizCsv(p, [oferta('x', 100.5, 900), oferta('y', 120, 500)], empresa));
     expect(ls[0]).toBe('Pedido PC-1;"Insumos; seguridad"');
     expect(ls[1]).toBe('Cierre;05/11/2026');
-    expect(ls[3]).toBe('Ítem;Descripción;Cantidad;Unidad;Equis SA unitario neto;Equis SA subtotal neto;Ye SRL unitario neto;Ye SRL subtotal neto;Menor precio;Adjudicado a');
-    expect(ls[4]).toBe('Cámara IP;"Domo ""4MP""";10;unidad;100,5;1005;120;1200;Equis SA;Equis SA');
-    expect(ls[5]).toBe('Grabador NVR;;2;unidad;900;1800;500;1000;Ye SRL;Ye SRL');
+    expect(ls[2]).toBe('Moneda;Pesos (ARS)');
+    expect(ls[4]).toBe('Ítem;Descripción;Cantidad;Unidad;Equis SA unitario neto;Equis SA subtotal neto;Ye SRL unitario neto;Ye SRL subtotal neto;Menor precio;Adjudicado a');
+    expect(ls[5]).toBe('Cámara IP;"Domo ""4MP""";10;unidad;100,5;1005;120;1200;Equis SA;Equis SA');
+    expect(ls[6]).toBe('Grabador NVR;;2;unidad;900;1800;500;1000;Ye SRL;Ye SRL');
     expect(ls.find((l) => l.includes('Total con IVA'))).toBe(';;;Total con IVA;;3394,05;;2662');
+  });
+  it('en dólares agrega el dólar de cada oferta y el total en pesos', () => {
+    const p = pedido({ moneda: 'USD' });
+    const ls = lineas(matrizCsv(p, [{ ...oferta('x', 100, 900), tipoCambio: { valor: 1000, fuente: 'BNA', fecha: '2026-11-01' } }, oferta('y', 120, 500)], empresa));
+    expect(ls[2]).toBe('Moneda;Dólares (USD)');
+    expect(ls.find((l) => l.includes('Dólar oficial'))).toBe(';;;Dólar oficial BNA vendedor;;1000;;');
+    expect(ls.find((l) => l.includes('en pesos'))).toBe(';;;Total con IVA en pesos;;3388000;;');
   });
   it('el historial suma solo lo adjudicado y deja vacío el monto de los abiertos', () => {
     const adj = pedido({ estado: 'adjudicado', adjudicacion: { a: 'x', b: 'y' }, adjudicados: ['x', 'y'] });
     const abierto = pedido({ id: 'PC-2', titulo: 'Otro', privado: true });
     const cerrado = pedido({ id: 'PC-3', titulo: 'Cerrado', cierre: '2026-10-20', cierraEn: cierreIso('2026-10-20') });
     const ls = lineas(historialCsv([adj, abierto, cerrado], { 'PC-1': [oferta('x', 100, 900), oferta('y', 120, 500)] }, empresa, () => 'Seguridad', new Date('2026-11-01T12:00:00-03:00')));
-    expect(ls[1]).toBe('PC-1;"Insumos; seguridad";Seguridad;2;05/11/2026;No;2;Adjudicado;Equis SA, Ye SRL;2420');
-    expect(ls[2]).toBe('PC-2;Otro;Seguridad;2;05/11/2026;Sí;2;Abierto;;');
-    expect(ls[3]).toBe('PC-3;Cerrado;Seguridad;2;20/10/2026;No;2;En evaluación;;');
+    expect(ls[1]).toBe('PC-1;"Insumos; seguridad";Seguridad;2;05/11/2026;No;2;Adjudicado;Equis SA, Ye SRL;ARS;2420');
+    expect(ls[2]).toBe('PC-2;Otro;Seguridad;2;05/11/2026;Sí;2;Abierto;;ARS;');
+    expect(ls[3]).toBe('PC-3;Cerrado;Seguridad;2;20/10/2026;No;2;En evaluación;;ARS;');
   });
   it('genera nombres de archivo sin tildes ni símbolos', () => {
     expect(nombreArchivo('Matriz PC-1 Cámaras y grabadores!')).toBe('matriz-pc-1-camaras-y-grabadores.csv');

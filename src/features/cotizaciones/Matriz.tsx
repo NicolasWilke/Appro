@@ -5,6 +5,8 @@ import { fmt } from '@/i18n';
 import { Estrellas, Pill } from '@/ui/primitivas';
 import { promedio } from '../red/TarjetaProveedor';
 import { ListaEnlaces } from './Enlaces';
+import { Equivalente } from './Equivalente';
+import { monedaDe } from '@/domain/moneda';
 
 /**
  * Cuadro comparativo: ítems en filas, proveedores en columnas. Marca el menor precio por ítem,
@@ -18,6 +20,7 @@ export function Matriz({ pedido, cotis, provs, asignacion, onAsignar }: {
   onAsignar?: (itemId: string, proveedorId: string) => void;
 }) {
   const m = armarMatriz(pedido, cotis);
+  const mon = monedaDe(pedido);
   const prov = (id: string) => provs.find((p) => p.id === id);
   const elegida = (itemId: string, provId: string) => asignacion?.[itemId] === provId;
 
@@ -60,8 +63,8 @@ export function Matriz({ pedido, cotis, provs, asignacion, onAsignar }: {
                       <label className="matriz__celda">
                         {onAsignar && <input type="radio" name={`adj-${item.id}`} checked={sel} onChange={() => onAsignar(item.id, c.proveedorId)} aria-label={`Adjudicar ${item.nombre} a ${prov(c.proveedorId)?.empresa ?? c.proveedorId}`} />}
                         <span>
-                          <span className="mono">{fmt.moneda(x.unitarioNeto)}</span> {x.mejor && <Pill tono="ok">Menor</Pill>}
-                          <span className="tenue bloque-linea mono">{fmt.moneda(x.neto)} neto</span>
+                          <span className="mono">{fmt.importe(x.unitarioNeto, mon)}</span> {x.mejor && <Pill tono="ok">Menor</Pill>}
+                          <span className="tenue bloque-linea mono">{fmt.importe(x.neto, mon)} neto</span>
                         </span>
                       </label>
                     ) : '—'}
@@ -72,9 +75,15 @@ export function Matriz({ pedido, cotis, provs, asignacion, onAsignar }: {
           ))}
         </tbody>
         <tfoot>
-          <tr><th scope="row" colSpan={2}>Neto</th>{m.totales.map((t) => <td key={t.proveedorId} className="num mono">{fmt.moneda(t.neto)}</td>)}</tr>
-          <tr><th scope="row" colSpan={2}>IVA</th>{m.totales.map((t) => <td key={t.proveedorId} className="num mono">{fmt.moneda(t.iva)}</td>)}</tr>
-          <tr className="tabla__total"><th scope="row" colSpan={2}>Total con IVA</th>{m.totales.map((t) => <td key={t.proveedorId} className={`num mono ${m.totalMasBajo.includes(t.proveedorId) ? 'is-mejor' : ''}`}>{fmt.moneda(t.total)}</td>)}</tr>
+          <tr><th scope="row" colSpan={2}>Neto</th>{m.totales.map((t) => <td key={t.proveedorId} className="num mono">{fmt.importe(t.neto, mon)}</td>)}</tr>
+          <tr><th scope="row" colSpan={2}>IVA</th>{m.totales.map((t) => <td key={t.proveedorId} className="num mono">{fmt.importe(t.iva, mon)}</td>)}</tr>
+          <tr className="tabla__total"><th scope="row" colSpan={2}>Total con IVA</th>{m.totales.map((t) => <td key={t.proveedorId} className={`num mono ${m.totalMasBajo.includes(t.proveedorId) ? 'is-mejor' : ''}`}>{fmt.importe(t.total, mon)}</td>)}</tr>
+          {mon === 'USD' && (
+            <tr><th scope="row" colSpan={2}>Total en pesos<span className="tenue bloque-linea">Dólar oficial BNA vendedor del día en que cotizó</span></th>{m.totales.map((t) => {
+              const c = cotis.find((x) => x.proveedorId === t.proveedorId);
+              return <td key={t.proveedorId} className="num">{c?.tipoCambio ? <Equivalente monto={t.total} moneda="USD" tc={c.tipoCambio} corto /> : <span className="tenue">—</span>}</td>;
+            })}</tr>
+          )}
           <tr><th scope="row" colSpan={2}>Plazo de entrega</th>{cotis.map((c) => <td key={c.id} className={`num mono ${m.entregaMasRapida.includes(c.proveedorId) ? 'is-mejor' : ''}`}>{c.plazoDias} d</td>)}</tr>
           <tr><th scope="row" colSpan={2}>Oferta válida hasta</th>{cotis.map((c) => <td key={c.id} className="num">{c.vigencia ? fmt.fecha(c.vigencia) : '—'}</td>)}</tr>
           <tr><th scope="row" colSpan={2}>Pago</th>{cotis.map((c) => <td key={c.id}>{c.pago}</td>)}</tr>

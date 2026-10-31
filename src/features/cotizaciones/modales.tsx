@@ -8,6 +8,8 @@ import { fmt } from '@/i18n';
 import { Modal } from '@/ui/Modal';
 import { useToast } from '@/ui/Toast';
 import { EditorEnlaces } from './Enlaces';
+import { Equivalente, useDolar } from './Equivalente';
+import { monedaDe } from '@/domain/moneda';
 import { LecturaIndice } from './LecturaIndice';
 
 const aNumero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'));
@@ -18,7 +20,10 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
   const repo = useRepo();
   const avisar = useToast();
   const { data: indice } = useQuery((r) => r.indicePrecios(), []);
-  const ref = pedido.items.length === 1 ? indice?.series.find((s) => s.rubro === pedido.rubro) : undefined;
+  const mon = monedaDe(pedido);
+  // El índice está en pesos: solo sirve de referencia en pedidos en pesos.
+  const ref = pedido.items.length === 1 && mon === 'ARS' ? indice?.series.find((s) => s.rubro === pedido.rubro) : undefined;
+  const dolar = useDolar();
   const [precios, setPrecios] = useState(() => Object.fromEntries(pedido.items.map((i) => [i.id, { precio: '', descuento: '0', iva: '21' }])));
   const [plazo, setPlazo] = useState('15');
   const [vigencia, setVigencia] = useState(enDias(15));
@@ -45,6 +50,7 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
       await repo.cotizar({
         pedidoId: pedido.id, proveedorId, items, precioUnitario: lineas[0]?.unitarioNeto ?? 0,
         plazoDias: Number(plazo), vigencia, pago, nota: nota.trim(), adjuntos,
+        ...(dolar ? { tipoCambio: dolar } : {}),
       });
       avisar(pedido.sobreCerrado
         ? `Oferta enviada y sellada. El comprador ve que cotizaste, pero tus precios recién al cierre (${fmt.fecha(pedido.cierre)} ${horaDeCierre(pedido.cierraEn)}).`
@@ -60,7 +66,7 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
         <p className="tenue">{pedido.entrega} · Pago pedido: {pedido.pago} · Cierra {fmt.fecha(pedido.cierre)} {horaDeCierre(pedido.cierraEn)}</p>
         <div className="tabla-envoltura">
           <table className="tabla tabla--cotizar">
-            <thead><tr><th>Ítem</th><th className="num">Cantidad</th><th className="num">Precio unitario</th><th className="num">Desc. %</th><th>IVA</th><th className="num">Subtotal neto</th></tr></thead>
+            <thead><tr><th>Ítem</th><th className="num">Cantidad</th><th className="num">Precio unitario{mon === 'USD' ? ' (US$)' : ''}</th><th className="num">Desc. %</th><th>IVA</th><th className="num">Subtotal neto</th></tr></thead>
             <tbody>
               {pedido.items.map((i, n) => (
                 <tr key={i.id}>
@@ -68,18 +74,19 @@ export function CotizarModal({ pedido, proveedorId, onCerrar }: { pedido: Pedido
                   <td className="num mono">{fmt.numero(i.cantidad)} <span className="tenue">{i.unidad}</span></td>
                   <td className="num"><input aria-label={`Precio unitario de ${i.nombre}`} inputMode="decimal" className="mono entrada-num" value={precios[i.id].precio} onChange={(e) => set(i.id, 'precio', e.target.value)} placeholder={ref ? fmt.numero(ref.actual) : '0'} /></td>
                   <td className="num"><input aria-label={`Descuento de ${i.nombre}`} inputMode="decimal" className="mono entrada-num entrada-num--chica" value={precios[i.id].descuento} onChange={(e) => set(i.id, 'descuento', e.target.value)} /></td>
-                  <td><select aria-label={`IVA de ${i.nombre}`} value={precios[i.id].iva} onChange={(e) => set(i.id, 'iva', e.target.value)}>{IVAS.map((x) => <option key={x} value={x}>{fmt.numero(x)} %</option>)}</select></td>
-                  <td className="num mono">{lineas[n] ? fmt.moneda(lineas[n]!.neto) : '—'}</td>
+                  <td><select className="entrada-iva" aria-label={`IVA de ${i.nombre}`} value={precios[i.id].iva} onChange={(e) => set(i.id, 'iva', e.target.value)}>{IVAS.map((x) => <option key={x} value={x}>{fmt.numero(x)} %</option>)}</select></td>
+                  <td className="num mono">{lineas[n] ? fmt.importe(lineas[n]!.neto, mon) : '—'}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr><td colSpan={5}>Neto</td><td className="num mono">{fmt.moneda(neto)}</td></tr>
-              <tr><td colSpan={5}>IVA</td><td className="num mono">{fmt.moneda(iva)}</td></tr>
-              <tr className="tabla__total"><td colSpan={5}>Total{!completos && <span className="tenue"> · faltan precios</span>}</td><td className="num mono">{fmt.moneda(neto + iva)}</td></tr>
+              <tr><td colSpan={5}>Neto</td><td className="num mono">{fmt.importe(neto, mon)}</td></tr>
+              <tr><td colSpan={5}>IVA</td><td className="num mono">{fmt.importe(iva, mon)}</td></tr>
+              <tr className="tabla__total"><td colSpan={5}>Total{!completos && <span className="tenue"> · faltan precios</span>}</td><td className="num mono">{fmt.importe(neto + iva, mon)}</td></tr>
             </tfoot>
           </table>
         </div>
+        {mon === 'USD' && <p className="nota">Este pedido se cotiza en <strong>dólares</strong>.{neto > 0 && <> <Equivalente monto={neto + iva} moneda="USD" tc={dolar} /></>}{!dolar && ' El equivalente en pesos aparece cuando carga el dólar del día.'}</p>}
         {ref && lineas[0] && (
           <p className="nota">Mediana del índice: <strong className="mono">{fmt.moneda(ref.actual)}</strong>. Tu precio neto queda <LecturaIndice desvio={desvioVsIndice(lineas[0].unitarioNeto, ref.actual)} /></p>
         )}

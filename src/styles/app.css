@@ -605,3 +605,6 @@ textarea { resize: vertical; line-height: 1.5; }
 .admin-dato { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
 .admin-dato__nombre { flex: 1 1 100%; font-size: var(--t-s); }
 .desborde { overflow-x: auto; }
+
+/* Cotizar: el IVA tiene que leerse completo (21 %, 10,5 %). */
+.entrada-iva { width: auto; min-width: 6.5rem; }

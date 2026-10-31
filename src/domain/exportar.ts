@@ -29,6 +29,7 @@ export function matrizCsv(p: PedidoCotizacion, cotis: Cotizacion[], empresa: (pr
   const filas: Celda[][] = [
     [`Pedido ${p.id}`, p.titulo],
     ['Cierre', fecha(p.cierre)],
+    ['Moneda', p.moneda === 'USD' ? 'Dólares (USD)' : 'Pesos (ARS)'],
     [],
     ['Ítem', 'Descripción', 'Cantidad', 'Unidad', ...nombres.flatMap((n) => [`${n} unitario neto`, `${n} subtotal neto`]), 'Menor precio', 'Adjudicado a'],
   ];
@@ -46,6 +47,10 @@ export function matrizCsv(p: PedidoCotizacion, cotis: Cotizacion[], empresa: (pr
     pie('Neto', m.totales.map((t) => t.neto)),
     pie('IVA', m.totales.map((t) => t.iva)),
     pie('Total con IVA', m.totales.map((t) => t.total)),
+    ...(p.moneda === 'USD' ? [
+      pie('Dólar oficial BNA vendedor', cotis.map((c) => c.tipoCambio?.valor ?? null)),
+      pie('Total con IVA en pesos', m.totales.map((t) => { const c = cotis.find((x) => x.proveedorId === t.proveedorId); return c?.tipoCambio ? Math.round(t.total * c.tipoCambio.valor) : null; })),
+    ] : []),
     pie('Plazo de entrega (días)', cotis.map((c) => c.plazoDias)),
     pie('Oferta válida hasta', cotis.map((c) => (c.vigencia ? fecha(c.vigencia) : ''))),
     pie('Pago', cotis.map((c) => c.pago)),
@@ -62,7 +67,7 @@ export function historialCsv(
   rubro: (id: PedidoCotizacion['rubro']) => string,
   ahora = new Date(),
 ) {
-  const filas: Celda[][] = [['Pedido', 'Título', 'Rubro', 'Ítems', 'Cierre', 'Privado', 'Ofertas', 'Estado', 'Adjudicado a', 'Monto adjudicado con IVA']];
+  const filas: Celda[][] = [['Pedido', 'Título', 'Rubro', 'Ítems', 'Cierre', 'Privado', 'Ofertas', 'Estado', 'Adjudicado a', 'Moneda', 'Monto adjudicado con IVA']];
   for (const p of pedidos) {
     const asig = p.adjudicacion ?? {};
     const ofertas = cotis[p.id] ?? [];
@@ -74,7 +79,7 @@ export function historialCsv(
       : null;
     filas.push([
       p.id, p.titulo, rubro(p.rubro), p.items.length, fecha(p.cierre), p.privado ? 'Sí' : 'No', p.ofertas,
-      p.estado === 'adjudicado' ? 'Adjudicado' : recibeOfertas(p, ahora) ? 'Abierto' : 'En evaluación', (p.adjudicados ?? []).map(empresa).join(', '), monto,
+      p.estado === 'adjudicado' ? 'Adjudicado' : recibeOfertas(p, ahora) ? 'Abierto' : 'En evaluación', (p.adjudicados ?? []).map(empresa).join(', '), p.moneda === 'USD' ? 'USD' : 'ARS', monto,
     ]);
   }
   return aCsv(filas);

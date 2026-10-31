@@ -177,7 +177,7 @@ service cloud.firestore {
     function lista(v, max) { return v is list && v.size() <= max; }
     function camposPedido() {
       return ['compradorId', 'titulo', 'descripcion', 'rubro', 'items', 'cantidad', 'unidad', 'entrega', 'pago', 'zona', 'cierre', 'cierraEn',
-              'privado', 'invitados', 'sobreCerrado', 'documentos', 'adjuntos', 'ofertas', 'estado', 'creado', 'avisado'];
+              'privado', 'invitados', 'sobreCerrado', 'documentos', 'adjuntos', 'moneda', 'ofertas', 'estado', 'creado', 'avisado'];
     }
     function pedidoNuevoValido(d) {
       return d.keys().hasOnly(camposPedido()) && d.keys().hasAll(camposPedido())
@@ -199,7 +199,8 @@ service cloud.firestore {
         && lista(d.invitados, 30)
         && (d.privado ? d.invitados.size() >= 1 : d.invitados.size() == 0)
         && lista(d.documentos, 10)
-        && lista(d.adjuntos, 10);
+        && lista(d.adjuntos, 10)
+        && d.moneda in ['ARS', 'USD'];
     }
     // Hasta 5 proveedores adjudicados, cada uno con su oferta; el principal (adjudicadaA) va primero.
     function adjudicacionValida(id, d) {
@@ -246,7 +247,7 @@ service cloud.firestore {
           && miRol() == 'proveedor'
           && recibeOfertas(pedido(id))
           && (pedido(id).get('privado', false) == false || prov in pedido(id).invitados)
-          && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'items', 'precioUnitario', 'plazoDias', 'vigencia', 'pago', 'nota', 'adjuntos', 'creada'])
+          && request.resource.data.keys().hasOnly(['pedidoId', 'proveedorId', 'items', 'precioUnitario', 'plazoDias', 'vigencia', 'pago', 'nota', 'adjuntos', 'tipoCambio', 'creada'])
           && request.resource.data.keys().hasAll(['pedidoId', 'proveedorId', 'items', 'precioUnitario', 'plazoDias', 'vigencia', 'pago', 'nota', 'adjuntos', 'creada'])
           && request.resource.data.pedidoId == id
           && request.resource.data.proveedorId == prov
@@ -257,6 +258,13 @@ service cloud.firestore {
           && texto(request.resource.data.pago, 1, 60)
           && texto(request.resource.data.nota, 0, 500)
           && lista(request.resource.data.adjuntos, 10)
+          // Dólar oficial del momento (opcional): solo valor, fuente y fecha.
+          && (!('tipoCambio' in request.resource.data) || (
+            request.resource.data.tipoCambio is map
+            && request.resource.data.tipoCambio.keys().hasOnly(['valor', 'fuente', 'fecha'])
+            && request.resource.data.tipoCambio.valor is number && request.resource.data.tipoCambio.valor > 0
+            && texto(request.resource.data.tipoCambio.fuente, 1, 60)
+            && request.resource.data.tipoCambio.fecha is string && request.resource.data.tipoCambio.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
           && request.resource.data.creada == request.time
           // El contador del pedido sube en el mismo lote.
           && getAfter(/databases/$(database)/documents/pedidos/$(id)).data.ofertas == pedido(id).get('ofertas', 0) + 1;

@@ -91,6 +91,12 @@ export interface ItemPedido {
 /** Archivo compartido como enlace (Drive, Dropbox, web): el plan Spark no guarda archivos. */
 export interface Enlace { nombre: string; url: string }
 
+/** Moneda en la que se cotiza un pedido. Los pedidos viejos, sin moneda, son en pesos. */
+export type Moneda = 'ARS' | 'USD';
+
+/** Dólar con el que se calculó el equivalente de una oferta: queda guardado para que el resumen no cambie. */
+export interface TipoCambio { valor: number; fuente: string; fecha: string }
+
 export interface PedidoCotizacion {
   id: string;
   compradorId: string;
@@ -117,6 +123,8 @@ export interface PedidoCotizacion {
   /** Documentos que el proveedor tiene que presentar con su oferta */
   documentos: string[];
   adjuntos: Enlace[];
+  /** Moneda de las ofertas. Sin valor: pesos. */
+  moneda?: Moneda;
   /** Cuántas ofertas llegaron (visible aunque los precios estén cerrados) */
   ofertas: number;
   estado: 'abierto' | 'adjudicado';
@@ -145,6 +153,8 @@ export interface Cotizacion {
   pago: string;
   nota: string;
   adjuntos: Enlace[];
+  /** Dólar oficial del momento de cotizar, si se pudo obtener */
+  tipoCambio?: TipoCambio;
   creada: string;
 }
 
