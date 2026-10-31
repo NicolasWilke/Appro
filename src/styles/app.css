@@ -53,8 +53,8 @@ a:hover { color: var(--sello-hover); }
 .segmento--ancho { display: flex; } .segmento--ancho button { flex: 1; padding: 0.7rem; }
 .aviso-demo { background: var(--senal-suave); color: var(--tinta); font-size: var(--t-s); border-bottom: 1px solid var(--senal-borde); }
 .aviso-demo .envoltura { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding-block: 0.45rem; flex-wrap: wrap; }
-/* Con el lema en la cabecera, la navegación pasa a su propia fila antes de quedar cortada. */
-@media (max-width: 1320px) {
+/* El menú va en la fila del logo; en pantallas angostas pasa a su propia fila antes de quedar cortado. */
+@media (max-width: 900px) {
   .nav { order: 3; flex-basis: 100%; }
   .cabecera__acc { margin-left: auto; }
 }
