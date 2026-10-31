@@ -5,7 +5,7 @@ import { useQuery, useRepo } from '@/data/DataProvider';
 import { CONDICIONES_PAGO, RUBROS, rubro } from '@/domain/catalogos';
 import { DOCUMENTOS_SUGERIDOS, HORA_CIERRE, INVITADOS_MAX, ITEMS_MAX, cierreIso } from '@/domain/rfq';
 import { ajustar, estimarTotal, factorInflacion, tieneValor, valorDelRubro } from '@/domain/valores';
-import type { Comprador, Enlace, ItemPedido, RubroId } from '@/domain/types';
+import type { Comprador, Enlace, ItemPedido, Moneda, RubroId } from '@/domain/types';
 import { fmt } from '@/i18n';
 import { Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
@@ -33,6 +33,7 @@ export function NuevoPedido() {
   const [pago, setPago] = useState('60 días fecha factura');
   const [zona, setZona] = useState<string | null>(null);
   const [sobreCerrado, setSobreCerrado] = useState(true);
+  const [moneda, setMoneda] = useState<Moneda>('ARS');
   // Desde el directorio se llega con ?invitar=a,b,c: el pedido arranca privado con esos proveedores.
   const [params] = useSearchParams();
   const preinvitados = (params.get('invitar') ?? '').split(',').filter(Boolean).slice(0, INVITADOS_MAX);
@@ -83,7 +84,7 @@ export function NuevoPedido() {
         compradorId: usuarioId, titulo: titulo.trim(), descripcion: descripcion.trim(), rubro: r, items: its,
         cantidad: its[0]?.cantidad ?? 0, unidad: its[0]?.unidad ?? '', entrega: entrega.trim(), pago, zona: (zona ?? data?.yo?.ciudad ?? '').trim(),
         cierre: fecha, cierraEn: fecha ? cierreIso(fecha, hora) : '', privado, invitados: privado ? invitados : [], sobreCerrado,
-        documentos, adjuntos,
+        documentos, adjuntos, moneda,
       });
       const avisos = await repo.avisosDePedido(p.id);
       avisar(privado
@@ -135,7 +136,7 @@ export function NuevoPedido() {
               </li>
             ))}
           </ol>
-          {valor && (
+          {valor && moneda === 'ARS' && (
             <div className="referencia">
               <p className="referencia__tit"><span className="etq">Valor de referencia</span> {valor.concepto}, por {valor.unidad}</p>
               <RangoValor v={valor} compacto />
@@ -151,6 +152,13 @@ export function NuevoPedido() {
             <label className="campo" htmlFor="np-pago"><span>Condición de pago</span><select id="np-pago" value={pago} onChange={(e) => setPago(e.target.value)}>{CONDICIONES_PAGO.map((c) => <option key={c}>{c}</option>)}</select></label>
             <label className="campo" htmlFor="np-zona"><span>Zona</span><input id="np-zona" maxLength={80} value={zona ?? data?.yo?.ciudad ?? ''} onChange={(e) => setZona(e.target.value)} /></label>
           </div>
+          <fieldset className="campo">
+            <legend>Moneda de las ofertas</legend>
+            <div className="opciones-fila" role="radiogroup" aria-label="Moneda de las ofertas">
+              <label className="opcion"><input type="radio" name="moneda" checked={moneda === 'ARS'} onChange={() => setMoneda('ARS')} /><span><strong>Pesos</strong>Todos cotizan en pesos argentinos.</span></label>
+              <label className="opcion"><input type="radio" name="moneda" checked={moneda === 'USD'} onChange={() => setMoneda('USD')} /><span><strong>Dólares</strong>Todos cotizan en dólares. Al lado de cada total ves el equivalente en pesos al dólar oficial BNA vendedor.</span></label>
+            </div>
+          </fieldset>
           <div className="form__fila">
             <label className="campo" htmlFor="np-cierre"><span>Recibís ofertas hasta el</span><input id="np-cierre" type="date" min={manana()} value={fecha} onChange={(e) => setFecha(e.target.value)} /></label>
             <label className="campo" htmlFor="np-hora"><span>A las (hora de Buenos Aires)</span><input id="np-hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} /></label>

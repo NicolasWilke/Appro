@@ -19,7 +19,7 @@ const ITEMS = [
 const pedido = (compradorId: string, cambios: Record<string, unknown> = {}) => ({
   compradorId, titulo: 'Vigilancia 24 h planta Rosario', descripcion: '', rubro: 'seguridad', items: ITEMS, cantidad: 720, unidad: 'horas vigilador',
   entrega: 'Desde el 1/12', pago: '30 días fecha factura', zona: 'Rosario', cierre: '2026-11-30', cierraEn: enDias(7),
-  privado: false, invitados: [], sobreCerrado: false, documentos: [], adjuntos: [], ofertas: 0, estado: 'abierto', creado: serverTimestamp(), avisado: false, ...cambios,
+  privado: false, invitados: [], sobreCerrado: false, documentos: [], adjuntos: [], moneda: 'ARS', ofertas: 0, estado: 'abierto', creado: serverTimestamp(), avisado: false, ...cambios,
 });
 const cotizacion = (pedidoId: string, proveedorId: string, cambios: Record<string, unknown> = {}) => ({
   pedidoId, proveedorId, items: [{ itemId: 'i1', precioUnitario: 15500, descuento: 0, iva: 21 }, { itemId: 'i2', precioUnitario: 90000, descuento: 5, iva: 21 }],
@@ -103,6 +103,12 @@ describe('pedidos: publicación y lectura', () => {
     await assertFails(setDoc(doc(como('comp1'), 'pedidos', 'PC-8'), pedido('comp1', { ofertas: 3 })));
     await assertFails(setDoc(doc(como('comp1'), 'pedidos', 'PC-9'), pedido('comp1', { items: [] })));
   });
+  it('un pedido va en pesos o en dólares, nada más', async () => {
+    await assertSucceeds(setDoc(doc(como('comp1'), 'pedidos', 'PC-2'), pedido('comp1', { moneda: 'USD' })));
+    await assertFails(setDoc(doc(como('comp1'), 'pedidos', 'PC-3'), pedido('comp1', { moneda: 'EUR' })));
+    const { moneda: _m, ...sinMoneda } = pedido('comp1');
+    await assertFails(setDoc(doc(como('comp1'), 'pedidos', 'PC-4'), sinMoneda));
+  });
   it('un pedido privado necesita invitados y uno público no los lleva', async () => {
     await assertSucceeds(setDoc(doc(como('comp1'), 'pedidos', 'PC-2'), pedido('comp1', { privado: true, invitados: ['prov1'] })));
     await assertFails(setDoc(doc(como('comp1'), 'pedidos', 'PC-3'), pedido('comp1', { privado: true, invitados: [] })));
@@ -156,6 +162,11 @@ describe('ofertas', () => {
     let ofertas: unknown;
     await env.withSecurityRulesDisabled(async (ctx) => { ofertas = (await getDoc(doc(ctx.firestore(), 'pedidos', 'PC-1'))).data()?.ofertas; });
     if (ofertas !== 1) throw new Error(`El contador quedó en ${ofertas}`);
+  });
+  it('la oferta puede guardar el dólar del día, con forma fija', async () => {
+    await assertFails(cotizar('prov1', 'PC-1', { tipoCambio: { valor: 0, fuente: 'BNA', fecha: '2026-10-31' } }));
+    await assertFails(cotizar('prov1', 'PC-1', { tipoCambio: { valor: 1000, fuente: 'BNA', fecha: '2026-10-31', extra: 1 } }));
+    await assertSucceeds(cotizar('prov1', 'PC-1', { tipoCambio: { valor: 1045.5, fuente: 'Dólar oficial BNA, vendedor', fecha: '2026-10-31' } }));
   });
   it('nadie cotiza a nombre de otro ni cambia la cantidad de ítems', async () => {
     const db = como('prov1');

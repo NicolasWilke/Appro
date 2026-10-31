@@ -1,3 +1,4 @@
+import { monedaDe } from '@/domain/moneda';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
@@ -189,10 +190,10 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
             const c = cotis.find((x) => x.proveedorId === pid);
             return (
               <p key={pid}><Pill tono="ok">Adjudicado</Pill> <Link to={`/red/${pid}`}>{prov(pid)?.empresa ?? pid}</Link>: {items.length === pedido.items.length ? 'todo el pedido' : items.map((i) => i.nombre).join(', ')}
-                {c && <span className="mono"> · {fmt.moneda(totales(pedido, c, items.map((i) => i.id)).total)}</span>}</p>
+                {c && <span className="mono"> · {fmt.importe(totales(pedido, c, items.map((i) => i.id)).total, monedaDe(pedido))}</span>}</p>
             );
           })}
-          <p className="tenue">Adjudicado en total: <strong className="mono">{fmt.moneda(a.adjudicado)}</strong>{a.monto > 0 && <> · Ahorro contra la oferta más alta: <strong className="mono">{fmt.moneda(a.monto)}</strong> ({fmt.pct(a.pct, false)})</>}</p>
+          <p className="tenue">Adjudicado en total: <strong className="mono">{fmt.importe(a.adjudicado, monedaDe(pedido))}</strong>{a.monto > 0 && <> · Ahorro contra la oferta más alta: <strong className="mono">{fmt.importe(a.monto, monedaDe(pedido))}</strong> ({fmt.pct(a.pct, false)})</>}</p>
           {pedido.comentarioAdjudicacion && <p><span className="etq">Justificación</span> {pedido.comentarioAdjudicacion}</p>}
         </div>
         <Matriz pedido={pedido} cotis={cotis} provs={provs} asignacion={asig} />
@@ -230,7 +231,7 @@ function VistaComprador({ pedido, cotis, provs }: { pedido: PedidoCotizacion; co
           {Object.keys(asignacion).length > 0 && <button type="button" className="btn btn--ter btn--chico" onClick={() => setAsignacion({})}>Limpiar</button>}
         </div>
         <p className="tenue">{completa
-          ? `${ganadores.length === 1 ? `Todo a ${prov(ganadores[0])?.empresa}` : `Repartido entre ${ganadores.length} proveedores`}: ${fmt.moneda(resumen!.adjudicado)} con IVA${resumen!.monto > 0 ? `, ${fmt.moneda(resumen!.monto)} menos que la oferta más alta` : ''}.`
+          ? `${ganadores.length === 1 ? `Todo a ${prov(ganadores[0])?.empresa}` : `Repartido entre ${ganadores.length} proveedores`}: ${fmt.importe(resumen!.adjudicado, monedaDe(pedido))} con IVA${resumen!.monto > 0 ? `, ${fmt.importe(resumen!.monto, monedaDe(pedido))} menos que la oferta más alta` : ''}.`
           : `Elegí una oferta por ítem en el cuadro (${Object.keys(asignacion).length} de ${pedido.items.length}) o usá un atajo.`}</p>
         <label className="campo" htmlFor="adj-comentario">
           <span>Justificación de la decisión (opcional, sale en el resumen ejecutivo)</span>

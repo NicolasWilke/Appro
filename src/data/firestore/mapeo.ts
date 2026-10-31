@@ -55,7 +55,7 @@ export function aPedido(id: string, d: Datos): PedidoCotizacion {
     cantidad: items[0].cantidad, unidad: items[0].unidad, entrega: d.entrega, pago: d.pago, zona: d.zona ?? '',
     cierre: d.cierre, cierraEn: d.cierraEn?.toDate ? isoArgentina(d.cierraEn.toDate()) : cierreIso(d.cierre, '23:59'),
     privado: d.privado === true, invitados: d.invitados ?? [], sobreCerrado: d.sobreCerrado === true,
-    documentos: d.documentos ?? [], adjuntos: d.adjuntos ?? [], ofertas: d.ofertas ?? 0, estado: d.estado,
+    documentos: d.documentos ?? [], adjuntos: d.adjuntos ?? [], moneda: d.moneda === 'USD' ? 'USD' : 'ARS', ofertas: d.ofertas ?? 0, estado: d.estado,
     ...(d.adjudicadaA ? { adjudicadaA: d.adjudicadaA, adjudicados: d.adjudicados ?? [d.adjudicadaA] } : {}),
     ...(d.adjudicacion ? { adjudicacion: d.adjudicacion } : d.adjudicadaA ? { adjudicacion: Object.fromEntries(items.map((i) => [i.id, d.adjudicadaA])) } : {}),
     ...(d.comentarioAdjudicacion ? { comentarioAdjudicacion: d.comentarioAdjudicacion } : {}),
@@ -67,6 +67,7 @@ export function aCotizacion(id: string, d: Datos, itemsPedido: ItemPedido[] = []
   return {
     id, pedidoId: d.pedidoId, proveedorId: d.proveedorId, items: itemsCotizadosDe(d, itemsPedido), precioUnitario: d.precioUnitario,
     plazoDias: d.plazoDias, vigencia: d.vigencia ?? '', pago: d.pago, nota: d.nota ?? '', adjuntos: d.adjuntos ?? [], creada: fechaIso(d.creada),
+    ...(d.tipoCambio ? { tipoCambio: d.tipoCambio } : {}),
   };
 }
 

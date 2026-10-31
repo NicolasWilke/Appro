@@ -1,3 +1,4 @@
+import { monedaDe } from '@/domain/moneda';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
@@ -48,8 +49,9 @@ export function ResumenEjecutivo() {
   const cuerpo = [
     `Resumen ejecutivo del pedido ${pedido.id} (${pedido.titulo}).`, '',
     `Ofertas recibidas: ${cotis.length}.`,
-    ganadores.length ? `Adjudicado a: ${ganadores.map(empresa).join(', ')}, por ${fmt.moneda(a.adjudicado)} con IVA.` : 'Todavía sin adjudicar.',
-    a.monto > 0 && ganadores.length ? `Ahorro contra la oferta más alta: ${fmt.moneda(a.monto)} (${fmt.pct(a.pct, false)}).` : '',
+    monedaDe(pedido) === 'USD' ? 'Montos en dólares estadounidenses.' : '',
+    ganadores.length ? `Adjudicado a: ${ganadores.map(empresa).join(', ')}, por ${fmt.importe(a.adjudicado, monedaDe(pedido))} con IVA.` : 'Todavía sin adjudicar.',
+    a.monto > 0 && ganadores.length ? `Ahorro contra la oferta más alta: ${fmt.importe(a.monto, monedaDe(pedido))} (${fmt.pct(a.pct, false)}).` : '',
     '', 'El detalle completo va en el PDF adjunto.',
   ].filter((x, i, xs) => x !== '' || xs[i - 1] !== '').join('\n');
 
@@ -93,7 +95,7 @@ export function ResumenEjecutivo() {
           <div className="hoja__kpis">
             <div className="kpi"><span className="kpi__k">{pedido.privado ? 'Proveedores invitados' : 'Proveedores notificados'}</span><span className="kpi__v mono">{pedido.privado ? pedido.invitados.length : avisos.length}</span></div>
             <div className="kpi"><span className="kpi__k">Ofertas recibidas</span><span className="kpi__v mono">{cotis.length}</span></div>
-            <div className="kpi"><span className="kpi__k">Ahorro estimado</span><span className="kpi__v mono">{ganadores.length ? fmt.moneda(a.monto) : '—'}</span><span className="tenue">{ganadores.length ? `${fmt.pct(a.pct, false)} contra la oferta más alta` : 'Se calcula al adjudicar'}</span></div>
+            <div className="kpi"><span className="kpi__k">Ahorro estimado</span><span className="kpi__v mono">{ganadores.length ? fmt.importe(a.monto, monedaDe(pedido)) : '—'}</span><span className="tenue">{ganadores.length ? `${fmt.pct(a.pct, false)} contra la oferta más alta` : 'Se calcula al adjudicar'}</span></div>
           </div>
         </section>
 
@@ -111,16 +113,17 @@ export function ResumenEjecutivo() {
                     <td className="num">{fmt.numero(item.cantidad)} {item.unidad}</td>
                     {celdas.map((x, n) => (
                       <td key={columnas[n].id} className={`num ${x?.mejor ? 'is-mejor' : ''} ${asig[item.id] === columnas[n].proveedorId ? 'is-elegida' : ''}`}>
-                        {x ? fmt.moneda(x.unitarioNeto) : '—'}
+                        {x ? fmt.importe(x.unitarioNeto, monedaDe(pedido)) : '—'}
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr><td colSpan={2}>Neto</td>{m.totales.map((t) => <td key={t.proveedorId} className="num">{fmt.moneda(t.neto)}</td>)}</tr>
-                <tr><td colSpan={2}>IVA</td>{m.totales.map((t) => <td key={t.proveedorId} className="num">{fmt.moneda(t.iva)}</td>)}</tr>
-                <tr className="hoja__total"><td colSpan={2}>Total con IVA</td>{m.totales.map((t) => <td key={t.proveedorId} className={`num ${m.totalMasBajo.includes(t.proveedorId) ? 'is-mejor' : ''}`}>{fmt.moneda(t.total)}</td>)}</tr>
+                <tr><td colSpan={2}>Neto</td>{m.totales.map((t) => <td key={t.proveedorId} className="num">{fmt.importe(t.neto, monedaDe(pedido))}</td>)}</tr>
+                <tr><td colSpan={2}>IVA</td>{m.totales.map((t) => <td key={t.proveedorId} className="num">{fmt.importe(t.iva, monedaDe(pedido))}</td>)}</tr>
+                {monedaDe(pedido) === 'USD' && <tr><td colSpan={2}>Total en pesos (dólar oficial BNA vendedor del día de cada oferta)</td>{m.totales.map((t) => { const c = columnas.find((x) => x.proveedorId === t.proveedorId); return <td key={t.proveedorId} className="num">{c?.tipoCambio ? fmt.importe(t.total * c.tipoCambio.valor, 'ARS') : '—'}</td>; })}</tr>}
+                <tr className="hoja__total"><td colSpan={2}>Total con IVA</td>{m.totales.map((t) => <td key={t.proveedorId} className={`num ${m.totalMasBajo.includes(t.proveedorId) ? 'is-mejor' : ''}`}>{fmt.importe(t.total, monedaDe(pedido))}</td>)}</tr>
                 <tr><td colSpan={2}>Plazo de entrega</td>{columnas.map((c) => <td key={c.id} className="num">{c.plazoDias} días</td>)}</tr>
               </tfoot>
             </table>
@@ -139,7 +142,7 @@ export function ResumenEjecutivo() {
               <dl key={pid} className="hoja__datos hoja__ganador">
                 <div><dt>Proveedor</dt><dd><strong>{empresa(pid)}</strong>{p ? ` · ${p.nombre} ${p.apellido}, ${p.cargo}` : ''}</dd></div>
                 <div><dt>Ítems</dt><dd>{items.length === pedido.items.length ? 'Todo el pedido' : items.map((i) => i.nombre).join(', ')}</dd></div>
-                {c && <div><dt>Monto con IVA</dt><dd>{fmt.moneda(totales(pedido, c, items.map((i) => i.id)).total)}</dd></div>}
+                {c && <div><dt>Monto con IVA</dt><dd>{fmt.importe(totales(pedido, c, items.map((i) => i.id)).total, monedaDe(pedido))}</dd></div>}
                 {c && <div><dt>Entrega</dt><dd>{c.plazoDias} días</dd></div>}
                 {c && <div><dt>Vigencia de la oferta</dt><dd>{c.vigencia ? fmt.fecha(c.vigencia) : '—'}</dd></div>}
                 {c && <div><dt>Pago</dt><dd>{c.pago}</dd></div>}

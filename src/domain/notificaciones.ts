@@ -51,6 +51,7 @@ function bloquePedido(p: PedidoCotizacion, c: Comprador, urlBase: string) {
     <tr><td style="padding:6px 0;color:#4F6280;width:140px">${p.items.length > 1 ? 'Ítems' : 'Cantidad'}</td><td style="padding:6px 0">${esc(cantidad(p))}</td></tr>
     <tr><td style="padding:6px 0;color:#4F6280">Entrega</td><td style="padding:6px 0">${esc(p.entrega)}</td></tr>
     <tr><td style="padding:6px 0;color:#4F6280">Pago</td><td style="padding:6px 0">${esc(p.pago)}</td></tr>
+    ${p.moneda === 'USD' ? '<tr><td style="padding:6px 0;color:#4F6280">Moneda</td><td style="padding:6px 0;font-weight:bold">Cotizar en dólares</td></tr>' : ''}
     <tr><td style="padding:6px 0;color:#4F6280">Zona</td><td style="padding:6px 0">${esc(p.zona)}</td></tr>
     <tr><td style="padding:6px 0;color:#4F6280">Cotizaciones hasta</td><td style="padding:6px 0;color:#8A5900;font-weight:bold">${cierre(p)}</td></tr>
   </table>
@@ -68,7 +69,7 @@ export function mailDePedido(p: PedidoCotizacion, c: Comprador, prov: Proveedor,
   const texto = [
     `Hola ${prov.nombre}, hay un pedido nuevo en tu rubro.`, '',
     `${p.id} · ${p.titulo}`, `Lo publicó ${conPunto(quienCompra(c))}`,
-    `${p.items.length > 1 ? 'Ítems' : 'Cantidad'}: ${cantidad(p)}`, `Entrega: ${p.entrega}`, `Pago: ${p.pago}`, `Zona: ${p.zona}`,
+    `${p.items.length > 1 ? 'Ítems' : 'Cantidad'}: ${cantidad(p)}`, `Entrega: ${p.entrega}`, `Pago: ${p.pago}`, ...(p.moneda === 'USD' ? ['Moneda: cotizar en dólares'] : []), `Zona: ${p.zona}`,
     `Cotizaciones hasta: ${cierre(p)}`, '', `Ver y cotizar: ${urlBase}/cotizaciones/${p.id}`, '',
     'Los datos de contacto del comprador se liberan solo si acepta tu solicitud o elige tu cotización.',
   ].join('\n');
