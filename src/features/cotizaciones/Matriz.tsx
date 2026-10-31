@@ -25,7 +25,8 @@ export function Matriz({ pedido, cotis, provs, asignacion, onAsignar }: {
   const elegida = (itemId: string, provId: string) => asignacion?.[itemId] === provId;
 
   return (
-    <div className="tabla-envoltura">
+    <>
+    <div className="tabla-envoltura matriz-tabla">
       <table className="tabla tabla--matriz">
         <thead>
           <tr>
@@ -97,5 +98,56 @@ export function Matriz({ pedido, cotis, provs, asignacion, onAsignar }: {
         </tfoot>
       </table>
     </div>
+    {/* En el celular la tabla no entra: una tarjeta por proveedor, ordenadas por total. */}
+    <ol className="matriz-tarjetas">
+      {[...m.totales].sort((a, b) => a.total - b.total).map((t) => {
+        const n = cotis.findIndex((c) => c.proveedorId === t.proveedorId);
+        const c = cotis[n];
+        const p = prov(c.proveedorId);
+        const todas = m.filas.every(({ item }) => elegida(item.id, c.proveedorId));
+        return (
+          <li key={c.id} className={`matriz-tarjeta ${m.totalMasBajo.includes(c.proveedorId) ? 'is-mejor' : ''}`}>
+            <header className="matriz-tarjeta__cab">
+              <div>
+                {p ? <Link to={`/red/${p.id}`} className="tabla__tit">{p.empresa}</Link> : c.proveedorId}
+                {p && promedio(p) > 0 && <span className="bloque-linea"><Estrellas valor={promedio(p)} /></span>}
+              </div>
+              <span className="matriz__etqs">
+                {m.totalMasBajo.includes(c.proveedorId) && <Pill tono="ok">Total más bajo</Pill>}
+                {m.entregaMasRapida.includes(c.proveedorId) && <Pill tono="sello">Entrega más rápida</Pill>}
+              </span>
+            </header>
+            <dl className="matriz-tarjeta__datos">
+              <div><dt>Total con IVA</dt><dd className="mono"><strong>{fmt.importe(t.total, mon)}</strong>{mon === 'USD' && c.tipoCambio && <Equivalente monto={t.total} moneda="USD" tc={c.tipoCambio} corto />}</dd></div>
+              <div><dt>Entrega</dt><dd className="mono">{c.plazoDias} días</dd></div>
+              <div><dt>Pago</dt><dd>{c.pago}</dd></div>
+              <div><dt>Válida hasta</dt><dd>{c.vigencia ? fmt.fecha(c.vigencia) : '—'}</dd></div>
+            </dl>
+            <details>
+              <summary>Precio por ítem</summary>
+              <ul className="matriz-tarjeta__items">
+                {m.filas.map(({ item, celdas }) => {
+                  const x = celdas[n];
+                  return (
+                    <li key={item.id}>
+                      <span>{item.nombre} <span className="tenue">· {fmt.numero(item.cantidad)} {item.unidad}</span></span>
+                      <span className="mono">{x ? fmt.importe(x.unitarioNeto, mon) : '—'} {x?.mejor && <Pill tono="ok">Menor</Pill>}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {c.nota && <p className="tenue">{c.nota}</p>}
+              {c.adjuntos.length > 0 && <ListaEnlaces enlaces={c.adjuntos} />}
+            </details>
+            {onAsignar && (
+              <button type="button" className={`btn btn--chico ${todas ? 'btn--pri' : 'btn--sec'}`} onClick={() => m.filas.forEach(({ item, celdas }) => { if (celdas[n]) onAsignar(item.id, c.proveedorId); })}>
+                {todas ? 'Elegida para adjudicar' : 'Elegir esta oferta'}
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+    </>
   );
 }
