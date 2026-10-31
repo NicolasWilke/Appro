@@ -7,6 +7,8 @@ import { ahorro, horaDeCierre, matriz, preciosVisibles, totales } from '@/domain
 import type { Comprador, Cotizacion } from '@/domain/types';
 import { fmt } from '@/i18n';
 import { Vacio } from '@/ui/primitivas';
+import { matrizCsv, nombreArchivo } from '@/domain/exportar';
+import { descargar } from '@/ui/descargar';
 
 const hoy = () => new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -58,6 +60,7 @@ export function ResumenEjecutivo() {
         <div className="resumen__acciones">
           <label className="opcion opcion--inline"><input type="checkbox" checked={soloFinalistas} onChange={(e) => setSoloFinalistas(e.target.checked)} /><span>Solo los 3 finalistas</span></label>
           <button className="btn btn--sec btn--chico" onClick={() => window.print()}>Imprimir o guardar PDF</button>
+          <button className="btn btn--sec btn--chico" onClick={() => descargar(nombreArchivo(`matriz ${pedido.id} ${pedido.titulo}`), matrizCsv(pedido, columnas, empresa))}>Descargar Excel</button>
           <a className="btn btn--pri btn--chico" href={`mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`}>Enviar por correo</a>
         </div>
         <p className="tenue resumen__ayuda">Para mandarlo por correo, primero guardalo como PDF y después adjuntalo al mail que se abre.</p>
