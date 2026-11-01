@@ -724,3 +724,21 @@ textarea { resize: vertical; line-height: 1.5; }
 .doble-moneda strong { font-size: 1.3rem; }
 .doble-moneda .tenue { font-size: var(--t-xs); }
 @media (max-width: 520px) { .doble-moneda { grid-template-columns: 1fr; } }
+
+/* App instalable: tarjeta abajo que ofrece instalar; en celular queda arriba de la barra inferior. */
+.instalar { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 32px)); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem 0.9rem; padding: 0.85rem 0.9rem; background: var(--superficie); color: var(--tinta); border: 1px solid var(--linea); border-radius: var(--r-m); box-shadow: var(--sombra); }
+.instalar__ico { border-radius: 10px; border: 1px solid var(--linea); background: #fff; }
+.instalar__txt { display: grid; gap: 0.15rem; font-size: var(--t-s); line-height: 1.35; }
+.instalar__txt strong { font-size: var(--t-m); }
+.instalar__txt span { color: var(--tenue); }
+.instalar__txt b { color: var(--tinta); font-weight: 600; }
+.instalar__compartir { vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--sello); }
+.instalar__acc { display: flex; gap: 0.25rem; align-items: center; }
+.pie__boton { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+@media (max-width: 560px) {
+  .instalar { grid-template-columns: auto minmax(0, 1fr); }
+  .instalar__acc { grid-column: 1 / -1; justify-content: flex-end; }
+}
+@media (max-width: 900px) { .app:has(.barra-movil) .instalar { bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)); } }
+@media print { .instalar { display: none !important; } }
+@media (prefers-reduced-motion: no-preference) { .instalar { animation: subir-instalar .3s ease-out; } @keyframes subir-instalar { from { transform: translate(-50%, 12px); opacity: 0; } } }

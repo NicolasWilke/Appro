@@ -7,6 +7,8 @@ import { t } from '@/i18n';
 import { useToast } from '@/ui/Toast';
 import { useAuth } from '@/auth/AuthProvider';
 import type { Rol } from '@/domain/types';
+import { AvisoInstalar } from './AvisoInstalar';
+import { reabrirAviso, useInstalacion } from './instalar';
 
 type Item = { a: string; texto: string; fin?: boolean; icono: keyof typeof ICONOS; activo?: string[] };
 
@@ -78,6 +80,7 @@ export function Layout() {
   const { pathname } = useLocation();
   const repo = useRepo();
   const avisar = useToast();
+  const { modo: modoInstalar } = useInstalacion();
 
   const [menuAbierto, setMenuAbierto] = useState(false);
   useEffect(() => { window.scrollTo(0, 0); setMenuAbierto(false); }, [pathname]);
@@ -174,6 +177,7 @@ export function Layout() {
           ))}
         </nav>
       )}
+      <AvisoInstalar />
       <footer className="pie">
         <div className="envoltura">
           <div className="pie__grilla">
@@ -193,7 +197,7 @@ export function Layout() {
           </div>
           <p className="pie__datos tenue">Datos personales tratados según la {REGION.leyDatos}. Base registrada ante la {REGION.autoridadDatos}. Ningún perfil se carga sin el consentimiento de su titular.</p>
           <div className="pie__base tenue">
-            <span>© {new Date().getFullYear()} {t.marca}. {MARCA.lema}{MARCA.contacto && <> · <a className="pie__link" href={`mailto:${MARCA.contacto}`}>{MARCA.contacto}</a></>}</span>
+            <span>© {new Date().getFullYear()} {t.marca}. {MARCA.lema}{MARCA.contacto && <> · <a className="pie__link" href={`mailto:${MARCA.contacto}`}>{MARCA.contacto}</a></>}{modoInstalar && <> · <button type="button" className="pie__link pie__boton" onClick={reabrirAviso}>Instalar la app</button></>}</span>
             <span className="mono">v0.1 · {auth.modo === 'firebase' ? `Firebase · ${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'sin proyecto'}` : 'modo demo'}</span>
           </div>
         </div>

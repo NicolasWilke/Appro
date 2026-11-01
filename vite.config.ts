@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 // Producción (mode por defecto): bundle normal con assets separados.
 export default defineConfig(({ mode }) => ({
   plugins: [react(), ...(mode === 'artifact' ? [viteSingleFile()] : [])],
-  base: './',
+  // Producción con base absoluta: así /cotizaciones/123 recargado encuentra /assets y el service worker cubre todo el sitio.
+  // La demo (artifact) es un solo archivo y sigue con rutas relativas.
+  base: mode === 'artifact' ? './' : '/',
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   build: { outDir: mode === 'artifact' ? 'dist-artifact' : 'dist' },
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
