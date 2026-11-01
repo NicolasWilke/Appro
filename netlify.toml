@@ -6,3 +6,21 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# App instalable: el service worker y el manifiesto no se guardan en caché del navegador,
+# así cada deploy llega enseguida a quien tiene la app instalada.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
