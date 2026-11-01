@@ -716,3 +716,11 @@ textarea { resize: vertical; line-height: 1.5; }
 .matriz-tarjeta details summary { cursor: pointer; font-size: var(--t-s); color: var(--sello); }
 .matriz-tarjeta__items { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0.4rem; font-size: var(--t-s); }
 .matriz-tarjeta__items li { display: flex; justify-content: space-between; gap: 0.75rem; }
+/* Cotización en dólares con su equivalente en pesos al lado */
+.doble-moneda { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.doble-moneda__caja { display: grid; gap: 0.25rem; padding: 0.9rem 1rem; border: 1px solid var(--linea); border-radius: var(--r-m); background: var(--superficie); }
+.doble-moneda__caja--pesos { background: var(--sello-suave); border-color: transparent; }
+.doble-moneda__tit { font: 500 var(--t-xs)/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--tenue); }
+.doble-moneda strong { font-size: 1.3rem; }
+.doble-moneda .tenue { font-size: var(--t-xs); }
+@media (max-width: 520px) { .doble-moneda { grid-template-columns: 1fr; } }
