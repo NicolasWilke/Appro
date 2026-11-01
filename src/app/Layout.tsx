@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useRepo } from '@/data/DataProvider';
 import { MARCA } from '@/config/marca';
@@ -79,7 +79,14 @@ export function Layout() {
   const repo = useRepo();
   const avisar = useToast();
 
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  useEffect(() => { window.scrollTo(0, 0); setMenuAbierto(false); }, [pathname]);
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuAbierto(false); };
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [menuAbierto]);
   const rol = cuenta?.perfil.rol;
   const nav = navDe(rol);
   const clase = (n: Item, base: string) => ({ isActive }: { isActive: boolean }) =>
@@ -120,7 +127,26 @@ export function Layout() {
               </>
             )}
           </div>
+          <button type="button" className="hamburguesa" aria-label={menuAbierto ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={menuAbierto} aria-controls="menu-chico" onClick={() => setMenuAbierto((v) => !v)}>
+            <svg viewBox="0 0 24 24" width={24} height={24} aria-hidden="true"><path d={menuAbierto ? 'M6 6l12 12M18 6L6 18' : 'M4 7h16M4 12h16M4 17h16'} /></svg>
+          </button>
         </div>
+        {menuAbierto && (
+          <nav id="menu-chico" className="menu-chico" aria-label="Menú">
+            <div className="envoltura">
+              {nav.map((n) => <NavLink key={n.a} to={n.a} end={n.fin} className={clase(n, 'menu-chico__link')}>{n.texto}</NavLink>)}
+              {rol && REFERENCIAS.filter((r) => !r.rol || r.rol === rol).map((r) => <NavLink key={r.a} to={r.a} className="menu-chico__link menu-chico__link--sub">{r.texto}</NavLink>)}
+              {cuenta
+                ? <NavLink to="/perfil" className="menu-chico__link">Mi perfil</NavLink>
+                : (
+                  <div className="menu-chico__acc">
+                    <NavLink to="/ingresar" className="btn btn--sec">Iniciar sesión</NavLink>
+                    <NavLink to="/ingresar?modo=registro" className="btn btn--pri">Registrarme</NavLink>
+                  </div>
+                )}
+            </div>
+          </nav>
+        )}
       </header>
       {auth.modo === 'demo' && (
         <div className="aviso-demo">

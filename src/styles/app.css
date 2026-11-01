@@ -53,10 +53,34 @@ a:hover { color: var(--sello-hover); }
 .segmento--ancho { display: flex; } .segmento--ancho button { flex: 1; padding: 0.7rem; }
 .aviso-demo { background: var(--senal-suave); color: var(--tinta); font-size: var(--t-s); border-bottom: 1px solid var(--senal-borde); }
 .aviso-demo .envoltura { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding-block: 0.45rem; flex-wrap: wrap; }
-/* Con el lema en la cabecera, la navegación pasa a su propia fila antes de quedar cortada. */
-@media (max-width: 1320px) {
-  .nav { order: 3; flex-basis: 100%; }
+/* En escritorio: logo a la izquierda, menú centrado en la pantalla, cuenta a la derecha. */
+@media (min-width: 901px) {
+  .cabecera__in { display: grid; grid-template-columns: 1fr auto 1fr; }
+  .cabecera__in > .marca { justify-self: start; }
+  .cabecera__in > .nav { flex: none; justify-self: center; }
+  .cabecera__acc { justify-self: end; }
+}
+/* Pantallas angostas: el menú se esconde detrás de un botón hamburguesa. */
+.hamburguesa { display: none; }
+.menu-chico { display: none; }
+@media (max-width: 900px) {
+  .nav { display: none; }
   .cabecera__acc { margin-left: auto; }
+  .hamburguesa { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--linea); border-radius: var(--r-s); background: var(--superficie); color: var(--tinta); cursor: pointer; flex: none; }
+  .hamburguesa svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .hamburguesa:hover { background: var(--superficie-2); }
+  .menu-chico { display: block; border-top: 1px solid var(--linea); background: var(--superficie); box-shadow: 0 8px 16px rgb(14 24 40 / 0.08); max-height: calc(100vh - 70px); overflow-y: auto; }
+  .menu-chico .envoltura { display: grid; padding-block: 0.5rem 1rem; }
+  .menu-chico__link { padding: 0.8rem 0.5rem; border-bottom: 1px solid var(--linea); color: var(--tinta); text-decoration: none; font-weight: 500; }
+  .menu-chico__link--sub { padding-left: 1.5rem; color: var(--tenue); font-size: var(--t-s); }
+  .menu-chico__link.active { color: var(--sello); }
+  .menu-chico__acc { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; padding-top: 1rem; }
+}
+/* En el celular sin sesión, Iniciar sesión y Registrarme pasan al menú. */
+@media (max-width: 560px) {
+  .cabecera:not(.cabecera--sesion) .cabecera__acc { display: none; }
+  .cabecera:not(.cabecera--sesion) .hamburguesa { margin-left: auto; }
+  .usuario__txt { display: none; }
 }
 @media (max-width: 480px) {
   .cabecera__panel { display: none; }
