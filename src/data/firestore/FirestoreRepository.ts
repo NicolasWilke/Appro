@@ -5,7 +5,7 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, Uso, ValorReferencia,
+  Antecedente, Comprador, CuentaAdmin, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { textoBuscable } from '@/domain/directorio';
@@ -342,6 +342,42 @@ export class FirestoreRepository implements Repository {
   }
   async esAdmin(uid: string) {
     try { return (await getDoc(doc(this.db, 'admins', uid))).exists(); } catch { return false; }
+  }
+
+  // ── Administración de cuentas (las reglas lo permiten solo a quien figura en admins/{uid})
+  async cuentasAdmin(): Promise<CuentaAdmin[]> {
+    const [usuarios, estados, pedidos] = await Promise.all([
+      getDocs(collection(this.db, 'users')), this.estados(), getDocs(collection(this.db, 'solicitudesPlan')),
+    ]);
+    const pendientes = new Map(pedidos.docs.map((d) => [d.id, { plan: d.data().plan as PlanId, fecha: fechaIso(d.data().pedido) }]));
+    const contactos = await Promise.all(usuarios.docs.map((u) => getDoc(doc(this.db, 'users', u.id, 'privado', 'contacto')).then((c) => c.data()?.email as string | undefined).catch(() => undefined)));
+    return usuarios.docs.map((u, i): CuentaAdmin => {
+      const d = u.data();
+      const e = estados.get(u.id) ?? {};
+      const v = e.verificaciones ?? {};
+      return {
+        id: u.id, rol: d.rol, empresa: d.empresa ?? '', contactoNombre: d.contactoNombre ?? '', cuit: d.cuit ?? '', email: contactos[i] ?? '',
+        plan: e.plan ?? 'gratis', verificado: !!(v.idFiscal && v.mailCorporativo && v.cargoRevisado), pedido: pendientes.get(u.id) ?? null,
+      };
+    }).sort((a, b) => Number(!!b.pedido) - Number(!!a.pedido) || a.empresa.localeCompare(b.empresa));
+  }
+  async activarPlan(uid: string, plan: PlanId) {
+    const lote = writeBatch(this.db);
+    lote.set(doc(this.db, 'estado', uid), { plan, actualizado: serverTimestamp(), actualizadoPor: this.auth.currentUser!.uid }, { merge: true });
+    lote.delete(doc(this.db, 'solicitudesPlan', uid));
+    await lote.commit();
+    this.tocar(undefined);
+  }
+  async descartarPedidoPlan(uid: string) {
+    await deleteDoc(doc(this.db, 'solicitudesPlan', uid));
+    this.tocar(undefined);
+  }
+  async verificarCuenta(uid: string, verificado: boolean) {
+    await setDoc(doc(this.db, 'estado', uid), {
+      verificaciones: { idFiscal: verificado, mailCorporativo: verificado, cargoRevisado: verificado },
+      actualizado: serverTimestamp(), actualizadoPor: this.auth.currentUser!.uid,
+    }, { merge: true });
+    this.tocar(undefined);
   }
 
   // ── Reseñas: una por proveedor ganador. La del principal usa el id del pedido (formato anterior).

@@ -1,4 +1,4 @@
-// Tareas del equipo sin panel de administración todavía.
+// Tareas del equipo por terminal. Plan y verificación también se hacen desde la web en /admin (pantalla Cuentas y planes).
 //   npm run admin -- plan <email> <gratis|pro|empresa>   activa un plan (después de cobrar)
 //   npm run admin -- verificar <email>                    marca CUIT, mail corporativo y cargo como revisados
 //   npm run admin -- pendientes                           lista los pedidos de plan sin atender

@@ -20,6 +20,7 @@ import { RequiereSesion } from './RequiereSesion';
 import { ComprasRecientes } from '@/features/recientes/ComprasRecientes';
 import { Referencias } from '@/features/referencias/Referencias';
 import { EditarIndices } from '@/features/admin/EditarIndices';
+import { Cuentas } from '@/features/admin/Cuentas';
 
 /** Enlaces viejos a /registro?rol=… siguen funcionando. */
 function RedirigirRegistro() {
@@ -50,6 +51,8 @@ const rutas = (
       <Route path="valores" element={<ValoresReferencia />} />
       <Route path="compras-recientes" element={<ComprasRecientes />} />
       <Route path="referencias" element={<Referencias />} />
+      <Route path="admin" element={<Cuentas />} />
+      <Route path="admin/cuentas" element={<Cuentas />} />
       <Route path="admin/indices" element={<EditarIndices />} />
       <Route path="admin/valores" element={<EditarValores />} />
     </Route>

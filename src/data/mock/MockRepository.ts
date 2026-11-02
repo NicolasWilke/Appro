@@ -2,7 +2,7 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, RegionId, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Antecedente, Comprador, CuentaAdmin, PlanId, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, RegionId, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { PLANES } from '@/domain/planes';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { antecedentesDe, antiguedad, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
@@ -353,6 +353,22 @@ export class MockRepository implements Repository {
   }
   /** En la demo cualquiera puede probar el panel de administración. */
   async esAdmin() { return true; }
+  /** En la demo los planes se activan al elegirlos: no hay pedidos pendientes. */
+  async cuentasAdmin(): Promise<CuentaAdmin[]> {
+    const v = (p: Persona) => p.verificaciones.idFiscal && p.verificaciones.mailCorporativo && p.verificaciones.cargoRevisado;
+    return [...this.estado.proveedores, ...this.estado.compradores].map((p) => ({
+      id: p.id, rol: p.rol, empresa: p.empresa, contactoNombre: `${p.nombre} ${p.apellido}`.trim(), cuit: p.idFiscal, email: p.contacto.email,
+      plan: p.rol === 'proveedor' ? p.plan : 'gratis' as PlanId, verificado: v(p), pedido: null,
+    })).sort((a, b) => a.empresa.localeCompare(b.empresa));
+  }
+  async activarPlan(uid: string, plan: PlanId) { await this.cambiarPlan(uid, plan); }
+  async descartarPedidoPlan() {}
+  async verificarCuenta(uid: string, verificado: boolean) {
+    const p = await this.obtenerPersona(uid);
+    if (!p) throw new Error('Cuenta inexistente');
+    p.verificaciones = { idFiscal: verificado, mailCorporativo: verificado, cargoRevisado: verificado };
+    this.guardar();
+  }
 
   async resenasDePedido(pedidoId: string) {
     return this.estado.proveedores.flatMap((p) => p.resenas.filter((r) => r.pedidoId === pedidoId).map((r) => ({ ...r, proveedorId: p.id })));
