@@ -358,6 +358,37 @@ const valor = (uid: string, cambios: Record<string, unknown> = {}) => ({
   min: 4800, mediana: 5200, max: 5900, fecha: '2026-10', actualizado: serverTimestamp(), actualizadoPor: uid, ...cambios,
 });
 
+describe('administración de cuentas', () => {
+  beforeEach(async () => {
+    await sembrar('admins/comp2', { nota: 'equipo' });
+    await sembrar('solicitudesPlan/prov2', { plan: 'empresa', pedido: new Date() });
+    await sembrar('users/prov2/privado/contacto', { email: 'ventas@prov2.com.ar', telefono: '' });
+  });
+  it('un admin ve los pedidos de plan y el mail de contacto', async () => {
+    await assertSucceeds(getDocs(collection(como('comp2'), 'solicitudesPlan')));
+    await assertSucceeds(getDoc(doc(como('comp2'), 'users', 'prov2', 'privado', 'contacto')));
+    await assertFails(getDocs(collection(como('prov1'), 'solicitudesPlan')));
+    await assertFails(getDoc(doc(como('prov1'), 'users', 'prov2', 'privado', 'contacto')));
+  });
+  it('un admin activa el plan y cierra el pedido en un lote, firmado', async () => {
+    const db = como('comp2');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'estado', 'prov2'), { plan: 'empresa', actualizado: serverTimestamp(), actualizadoPor: 'comp2' }, { merge: true });
+    lote.delete(doc(db, 'solicitudesPlan', 'prov2'));
+    await assertSucceeds(lote.commit());
+    await assertFails(setDoc(doc(db, 'estado', 'prov2'), { plan: 'oro', actualizado: serverTimestamp(), actualizadoPor: 'comp2' }, { merge: true }));
+    await assertFails(setDoc(doc(db, 'estado', 'prov2'), { plan: 'pro', actualizado: serverTimestamp(), actualizadoPor: 'prov1' }, { merge: true }));
+    await assertFails(setDoc(doc(db, 'estado', 'prov2'), { plan: 'pro', extra: 1, actualizado: serverTimestamp(), actualizadoPor: 'comp2' }, { merge: true }));
+  });
+  it('un admin verifica una cuenta; nadie más toca estado ni borra pedidos', async () => {
+    const verif = { verificaciones: { idFiscal: true, mailCorporativo: true, cargoRevisado: true } };
+    await assertSucceeds(setDoc(doc(como('comp2'), 'estado', 'prov2'), { ...verif, actualizado: serverTimestamp(), actualizadoPor: 'comp2' }, { merge: true }));
+    await assertFails(setDoc(doc(como('comp2'), 'estado', 'prov2'), { verificaciones: { idFiscal: 'si' }, actualizado: serverTimestamp(), actualizadoPor: 'comp2' }, { merge: true }));
+    await assertFails(setDoc(doc(como('prov2'), 'estado', 'prov2'), { ...verif, actualizado: serverTimestamp(), actualizadoPor: 'prov2' }, { merge: true }));
+    await assertFails(deleteDoc(doc(como('prov2'), 'solicitudesPlan', 'prov2')));
+  });
+});
+
 describe('administración de valores', () => {
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'admins', 'comp2'), { nota: 'equipo' }); });

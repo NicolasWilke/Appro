@@ -5,7 +5,7 @@ rules_version = '2';
 // users/{uid}                          perfil público: empresa, contacto, categoría, sector, ubicación, CUIT, logo
 // users/{uid}/privado/contacto         email y teléfono
 // users/{uid}/aceptados/{prov}         el comprador {uid} aceptó la solicitud del proveedor {prov}
-// estado/{uid}                         plan, verificaciones: solo lo escribe el equipo (consola o script)
+// estado/{uid}                         plan, verificaciones: solo lo escribe el equipo (/admin/cuentas, consola o script)
 // solicitudes/{id}                     pedido de contacto de un proveedor a un comprador
 // pedidos/{id}                         pedido de cotización: ítems, cierre, privado/invitados, sobre cerrado
 // pedidos/{id}/cotizaciones/{prov}     la oferta de cada proveedor, ítem por ítem (una por proveedor)
@@ -120,7 +120,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /privado/{doc} {
-        allow read: if doc == 'contacto' && (esDuenio(uid) || (tienePerfil() && puedeVerContacto(uid)));
+        allow read: if doc == 'contacto' && (esDuenio(uid) || esAdmin() || (tienePerfil() && puedeVerContacto(uid)));
         allow create, update: if doc == 'contacto' && esDuenio(uid) && contactoValido(request.resource.data);
         allow delete: if false;
       }
@@ -149,10 +149,20 @@ service cloud.firestore {
       }
     }
 
-    // Plan y verificaciones: los define el equipo, nunca el usuario.
+    // Plan y verificaciones: los define el equipo (un admin desde /admin/cuentas), nunca el usuario.
+    function verificacionesValidas(v) {
+      return v is map && v.keys().hasOnly(['idFiscal', 'mailCorporativo', 'cargoRevisado'])
+        && v.get('idFiscal', false) is bool && v.get('mailCorporativo', false) is bool && v.get('cargoRevisado', false) is bool;
+    }
     match /estado/{uid} {
       allow read: if tienePerfil();
-      allow write: if false;
+      allow create, update: if esAdmin()
+        && request.resource.data.keys().hasOnly(['plan', 'verificaciones', 'tasaRespuesta', 'certificaciones', 'actualizado', 'actualizadoPor'])
+        && (!('plan' in request.resource.data) || request.resource.data.plan in ['gratis', 'pro', 'empresa'])
+        && (!('verificaciones' in request.resource.data) || verificacionesValidas(request.resource.data.verificaciones))
+        && request.resource.data.actualizado == request.time
+        && request.resource.data.actualizadoPor == request.auth.uid;
+      allow delete: if false;
     }
 
     // ── Solicitudes de contacto
@@ -383,13 +393,14 @@ service cloud.firestore {
 
     // ── Planes: el proveedor lo pide, el equipo lo activa en estado/{uid}.
     match /solicitudesPlan/{uid} {
-      allow read: if esDuenio(uid);
+      allow read: if esDuenio(uid) || esAdmin();
+      // Un admin la cierra al activar el plan (o al descartarla).
+      allow delete: if esAdmin();
       allow create, update: if esDuenio(uid)
         && miRol() == 'proveedor'
         && request.resource.data.keys().hasOnly(['plan', 'pedido'])
         && request.resource.data.plan in ['gratis', 'pro', 'empresa']
         && request.resource.data.pedido == request.time;
-      allow delete: if false;
     }
 
     // ── Cupo del plan. usos/{prov} cuenta las solicitudes y ofertas del mes (UTC). Sube de a uno, en el mismo lote

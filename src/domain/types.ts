@@ -233,6 +233,20 @@ export interface Plan {
   regiones: number;
 }
 
+/** Una cuenta vista desde la administración: plan, verificación y pedido de plan pendiente. */
+export interface CuentaAdmin {
+  id: string;
+  rol: Rol;
+  empresa: string;
+  contactoNombre: string;
+  cuit: string;
+  email: string;
+  plan: PlanId;
+  verificado: boolean;
+  /** Pedido de plan sin atender, si hay */
+  pedido: { plan: PlanId; fecha: string } | null;
+}
+
 export interface Uso { solicitudesUsadas: number; respuestasUsadas: number }
 
 export interface Embudo {

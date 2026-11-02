@@ -1,5 +1,5 @@
 import type {
-  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
+  Antecedente, Comprador, CuentaAdmin, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
   Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
@@ -80,6 +80,14 @@ export interface Repository {
   guardarEscala(e: EscalaConvenio): Promise<void>;
   /** Si la cuenta puede editar los valores de referencia. */
   esAdmin(uid: string): Promise<boolean>;
+  /** Solo administradores: todas las cuentas, con plan, verificación y pedidos de plan pendientes. */
+  cuentasAdmin(): Promise<CuentaAdmin[]>;
+  /** Solo administradores: deja activo un plan (después de cobrar) y cierra el pedido pendiente. */
+  activarPlan(uid: string, plan: PlanId): Promise<void>;
+  /** Solo administradores: cierra un pedido de plan sin cambiar el plan. */
+  descartarPedidoPlan(uid: string): Promise<void>;
+  /** Solo administradores: marca CUIT, mail corporativo y cargo como revisados (o lo deshace). */
+  verificarCuenta(uid: string, verificado: boolean): Promise<void>;
 
   /** Las reseñas que el comprador dejó en un pedido adjudicado: una por proveedor ganador. */
   resenasDePedido(pedidoId: string): Promise<Resena[]>;

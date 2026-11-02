@@ -76,10 +76,18 @@ export function MiPerfil() {
             </div>
           </Seccion>
           <Link className="enlace" to={`/red/${c.uid}`}>Ver cómo me ven en la red</Link>
+          <EnlaceAdmin />
         </div>
       </div>
     </div>
   );
+}
+
+/** Solo para quien figura en admins/{uid}: acceso al panel del equipo. */
+function EnlaceAdmin() {
+  const { cuenta } = useAuth();
+  const { data: admin } = useQuery((r) => r.esAdmin(cuenta!.uid), [cuenta!.uid]);
+  return admin ? <Link className="enlace bloque-linea" to="/admin">Administración: cuentas y planes</Link> : null;
 }
 
 /** Regiones en las que el proveedor aparece en la red. La principal sale de su ubicación; sumar es del plan Empresa. */

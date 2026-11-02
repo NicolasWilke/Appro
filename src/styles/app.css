@@ -743,3 +743,9 @@ textarea { resize: vertical; line-height: 1.5; }
 @media print { .instalar { display: none !important; } }
 @media (prefers-reduced-motion: no-preference) { .instalar { animation: subir-instalar .3s ease-out; } @keyframes subir-instalar { from { transform: translate(-50%, 12px); opacity: 0; } } }
 .lista-regiones { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0.5rem; }
+.admin-cuentas { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
+.admin-cuentas__fila { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border: 1px solid var(--linea); border-radius: var(--radio, 10px); background: var(--superficie, #fff); }
+.admin-cuentas__fila--pedido { border-color: var(--sello); }
+.admin-cuentas__fila p { margin: 0; }
+.admin-cuentas__datos { display: grid; gap: 0.15rem; min-width: 14rem; flex: 1 1 16rem; }
+.admin-cuentas .acciones-sol { align-items: center; margin: 0; }
