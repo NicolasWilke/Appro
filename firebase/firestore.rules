@@ -11,6 +11,7 @@ rules_version = '2';
 // pedidos/{id}/cotizaciones/{prov}     la oferta de cada proveedor, ítem por ítem (una por proveedor)
 // pedidos/{id}/avisos/{prov}           a quién se avisó por mail (lo escribe el script de avisos)
 // solicitudesPlan/{uid}                el proveedor pide pasar a un plan pago
+// usos/{uid}                           contador del mes (UTC) de solicitudes y ofertas: hace cumplir el cupo del plan
 // valoresReferencia/{id}               valores de referencia: los edita un administrador desde /admin/valores
 // indicePrecios/{id}, config/{doc}     datos de referencia: solo lectura
 // indicadores/{id}, escalas/{id}        índices oficiales y escalas de convenio: los carga un admin en /admin/indices
@@ -50,6 +51,12 @@ service cloud.firestore {
     function soloCambia(campos) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
     }
+    // Plan vigente: lo escribe el equipo en estado/{uid}; sin documento, Gratis.
+    function planDe(uid) {
+      let ruta = /databases/$(database)/documents/estado/$(uid);
+      return exists(ruta) ? get(ruta).data.get('plan', 'gratis') : 'gratis';
+    }
+    function regionValida(r) { return r in ['ros', 'amba', 'cba', 'noa', 'costa']; }
 
     // ── Perfiles
     function logoValido(d) {
@@ -60,7 +67,7 @@ service cloud.firestore {
 
     function perfilValido(d) {
       return d.keys().hasOnly(['rol', 'empresa', 'contactoNombre', 'categoria', 'sector', 'ubicacion', 'cuit', 'logoUrl',
-                               'avisos', 'rubros', 'region', 'creado', 'actualizado'])
+                               'avisos', 'rubros', 'region', 'regiones', 'creado', 'actualizado'])
         && d.keys().hasAll(['rol', 'empresa', 'contactoNombre', 'categoria', 'ubicacion', 'cuit'])
         && d.rol in ['comprador', 'proveedor']
         && texto(d.empresa, 2, 120)
@@ -73,6 +80,16 @@ service cloud.firestore {
         && (!('rubros' in d) || (d.rubros is list && d.rubros.size() <= 7))
         && (!('region' in d) || d.region in ['ros', 'amba', 'cba', 'noa', 'costa'])
         && logoValido(d);
+    }
+
+    // Regiones que el proveedor suma a la principal. Sumar es del plan Empresa; si baja de plan, las que ya tenía
+    // pueden quedar guardadas (la app deja de mostrarlas) para que pueda seguir editando el resto del perfil.
+    function regionesValidas(uid, d) {
+      return !('regiones' in d)
+        || (d.regiones is list && d.regiones.size() <= 4 && d.regiones.hasOnly(['ros', 'amba', 'cba', 'noa', 'costa'])
+            && (d.regiones.size() == 0
+                || planDe(uid) == 'empresa'
+                || (resource != null && resource.data.get('regiones', []) == d.regiones)));
     }
 
     function contactoValido(d) {
@@ -95,9 +112,10 @@ service cloud.firestore {
     match /users/{uid} {
       // Solo usuarios registrados (con perfil) recorren la red. Cada uno siempre lee el suyo.
       allow read: if esDuenio(uid) || tienePerfil();
-      allow create: if esDuenio(uid) && perfilValido(request.resource.data);
+      allow create: if esDuenio(uid) && perfilValido(request.resource.data) && regionesValidas(uid, request.resource.data);
       // Rol, CUIT y fecha de alta quedan fijos.
-      allow update: if esDuenio(uid) && perfilValido(request.resource.data) && sinCambios(['rol', 'cuit', 'creado']);
+      allow update: if esDuenio(uid) && perfilValido(request.resource.data) && regionesValidas(uid, request.resource.data)
+        && sinCambios(['rol', 'cuit', 'creado']);
       // La baja la hace el equipo (Ley 25.326: supresión a pedido), no el cliente.
       allow delete: if false;
 
@@ -148,7 +166,9 @@ service cloud.firestore {
         && rolDe(request.resource.data.compradorId) == 'comprador'
         && request.resource.data.estado == 'pendiente'
         && texto(request.resource.data.motivo, 40, 300)
-        && request.resource.data.creada == request.time;
+        && request.resource.data.creada == request.time
+        // El contador del mes sube en el mismo lote y anota esta solicitud (ver usos).
+        && getAfter(usoRuta(request.resource.data.proveedorId)).data.get('ultimaSolicitud', '') == id;
       // Solo el comprador responde, y solo cambia el estado.
       allow update: if autenticado()
         && resource.data.compradorId == request.auth.uid
@@ -266,8 +286,9 @@ service cloud.firestore {
             && texto(request.resource.data.tipoCambio.fuente, 1, 60)
             && request.resource.data.tipoCambio.fecha is string && request.resource.data.tipoCambio.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
           && request.resource.data.creada == request.time
-          // El contador del pedido sube en el mismo lote.
-          && getAfter(/databases/$(database)/documents/pedidos/$(id)).data.ofertas == pedido(id).get('ofertas', 0) + 1;
+          // El contador del pedido sube en el mismo lote, y también el del mes del proveedor (ver usos).
+          && getAfter(/databases/$(database)/documents/pedidos/$(id)).data.ofertas == pedido(id).get('ofertas', 0) + 1
+          && getAfter(usoRuta(prov)).data.get('ultimaOferta', '') == id;
         allow update, delete: if false;
       }
 
@@ -368,6 +389,47 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['plan', 'pedido'])
         && request.resource.data.plan in ['gratis', 'pro', 'empresa']
         && request.resource.data.pedido == request.time;
+      allow delete: if false;
+    }
+
+    // ── Cupo del plan. usos/{prov} cuenta las solicitudes y ofertas del mes (UTC). Sube de a uno, en el mismo lote
+    // que la solicitud o la oferta nueva que anota (ultimaSolicitud / ultimaOferta), y nunca pasa el límite del plan.
+    // Las solicitudes y las ofertas no se borran: un id ya anotado no se puede volver a crear.
+    function usoRuta(uid) { return /databases/$(database)/documents/usos/$(uid); }
+    function mesActual() {
+      let m = request.time.month();
+      return string(request.time.year()) + (m < 10 ? '-0' : '-') + string(m);
+    }
+    function usadoAntes(campo) {
+      return (resource == null || resource.data.get('mes', '') != mesActual()) ? 0 : resource.data.get(campo, 0);
+    }
+    function anterior(campo) { return resource == null ? '' : resource.data.get(campo, ''); }
+    function limiteSolicitudes(plan) { return { 'gratis': 3, 'pro': 25, 'empresa': 80 }[plan]; }
+    function limiteRespuestas(plan) { return plan == 'gratis' ? 3 : 1000000; }
+    function sumaSolicitud(prov, d) {
+      return d.solicitudes == usadoAntes('solicitudes') + 1
+        && d.respuestas == usadoAntes('respuestas')
+        && d.get('ultimaOferta', '') == anterior('ultimaOferta')
+        && d.solicitudes <= limiteSolicitudes(planDe(prov))
+        && d.ultimaSolicitud is string
+        && !exists(/databases/$(database)/documents/solicitudes/$(d.ultimaSolicitud))
+        && getAfter(/databases/$(database)/documents/solicitudes/$(d.ultimaSolicitud)).data.proveedorId == prov;
+    }
+    function sumaOferta(prov, d) {
+      return d.respuestas == usadoAntes('respuestas') + 1
+        && d.solicitudes == usadoAntes('solicitudes')
+        && d.get('ultimaSolicitud', '') == anterior('ultimaSolicitud')
+        && d.respuestas <= limiteRespuestas(planDe(prov))
+        && d.ultimaOferta is string
+        && !exists(/databases/$(database)/documents/pedidos/$(d.ultimaOferta)/cotizaciones/$(prov))
+        && existsAfter(/databases/$(database)/documents/pedidos/$(d.ultimaOferta)/cotizaciones/$(prov));
+    }
+    match /usos/{prov} {
+      allow read: if esDuenio(prov);
+      allow create, update: if esDuenio(prov)
+        && request.resource.data.keys().hasOnly(['mes', 'solicitudes', 'respuestas', 'ultimaSolicitud', 'ultimaOferta'])
+        && request.resource.data.mes == mesActual()
+        && (sumaSolicitud(prov, request.resource.data) || sumaOferta(prov, request.resource.data));
       allow delete: if false;
     }
 

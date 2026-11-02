@@ -5,10 +5,11 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, Resena, SerieIndice, Uso, ValorReferencia,
+  Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { textoBuscable } from '@/domain/directorio';
+import { mesCupo, PLANES } from '@/domain/planes';
 import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
@@ -27,7 +28,8 @@ import type { NuevaCotizacion, NuevoPedido, Repository } from '../repository';
 function coincide(p: Persona, f?: FiltroRed) {
   if (!f) return true;
   if (f.rubro && !p.rubros.includes(f.rubro)) return false;
-  if (f.region && p.region !== f.region) return false;
+  // Un proveedor aparece en la región principal y en las que cubre (más de una con el plan Empresa).
+  if (f.region && p.region !== f.region && !(p.rol === 'proveedor' && (p.cobertura[f.region] ?? 0) > 0)) return false;
   if (f.soloVentanaAbierta && p.rol === 'comprador' && !ventanaAbierta(p)) return false;
   if (f.texto && !textoBuscable(p).includes(f.texto.toLowerCase())) return false;
   return true;
@@ -118,7 +120,12 @@ export class FirestoreRepository implements Repository {
     validarSolicitud({
       motivo, plan: (prov as Proveedor).plan, uso, existentes: enviadas.filter((s) => s.compradorId === compradorId), compradorRecibe: true,
     });
-    const ref = await addDoc(collection(this.db, 'solicitudes'), { proveedorId, compradorId, motivo: motivo.trim(), estado: 'pendiente', creada: serverTimestamp() });
+    // La solicitud y el contador del mes van juntos: las reglas no dejan pasar el cupo del plan.
+    const ref = doc(collection(this.db, 'solicitudes'));
+    const lote = writeBatch(this.db);
+    lote.set(ref, { proveedorId, compradorId, motivo: motivo.trim(), estado: 'pendiente', creada: serverTimestamp() });
+    lote.set(doc(this.db, 'usos', proveedorId), await this.contadorConUnoMas(proveedorId, { ultimaSolicitud: ref.id }));
+    await lote.commit();
     return this.tocar({ id: ref.id, proveedorId, compradorId, motivo: motivo.trim(), estado: 'pendiente' as const, creada: hoyIso() });
   }
   async responderSolicitud(id: string, estado: 'aceptada' | 'postergada' | 'rechazada') {
@@ -185,6 +192,7 @@ export class FirestoreRepository implements Repository {
       ...nueva, plazoDias: Math.round(nueva.plazoDias), nota: nueva.nota ?? '', creada: serverTimestamp(),
     });
     lote.update(doc(this.db, 'pedidos', nueva.pedidoId), { ofertas: increment(1) });
+    lote.set(doc(this.db, 'usos', nueva.proveedorId), await this.contadorConUnoMas(nueva.proveedorId, { ultimaOferta: nueva.pedidoId }));
     await lote.commit();
     return this.tocar({ ...nueva, id: nueva.proveedorId, creada: hoyIso() });
   }
@@ -363,16 +371,44 @@ export class FirestoreRepository implements Repository {
   }
 
   // ── Planes y uso
+  /**
+   * usos/{proveedor}: contador del mes (UTC) que las reglas usan para hacer cumplir el cupo del plan.
+   * Cada solicitud u oferta lo sube de a uno en el mismo lote y anota cuál fue, para que no se pueda inventar.
+   */
+  private async contadorConUnoMas(proveedorId: string, cambio: { ultimaSolicitud: string } | { ultimaOferta: string }) {
+    const mes = mesCupo();
+    const previo = (await getDoc(doc(this.db, 'usos', proveedorId))).data();
+    const base = previo?.mes === mes ? previo : { ...previo, solicitudes: 0, respuestas: 0 };
+    return {
+      ...(previo?.ultimaSolicitud ? { ultimaSolicitud: previo.ultimaSolicitud } : {}),
+      ...(previo?.ultimaOferta ? { ultimaOferta: previo.ultimaOferta } : {}),
+      mes,
+      solicitudes: (base.solicitudes ?? 0) + ('ultimaSolicitud' in cambio ? 1 : 0),
+      respuestas: (base.respuestas ?? 0) + ('ultimaOferta' in cambio ? 1 : 0),
+      ...cambio,
+    };
+  }
   async uso(proveedorId: string): Promise<Uso> {
     const desde = inicioMes();
-    const [sol, cot] = await Promise.all([
+    const [sol, cot, contador] = await Promise.all([
       this.solicitudesEnviadas(proveedorId),
       getDocs(query(collectionGroup(this.db, 'cotizaciones'), where('proveedorId', '==', proveedorId))),
+      getDoc(doc(this.db, 'usos', proveedorId)).then((d) => d.data()).catch(() => undefined),
     ]);
+    // Lo que cuentan las reglas manda; lo contado a mano cubre lo enviado antes de que existiera el contador.
+    const delMes = contador?.mes === mesCupo() ? contador : undefined;
     return {
-      solicitudesUsadas: sol.filter((s) => s.creada >= desde).length,
-      respuestasUsadas: cot.docs.filter((d) => fechaIso(d.data().creada) >= desde).length,
+      solicitudesUsadas: Math.max(sol.filter((s) => s.creada >= desde).length, delMes?.solicitudes ?? 0),
+      respuestasUsadas: Math.max(cot.docs.filter((d) => fechaIso(d.data().creada) >= desde).length, delMes?.respuestas ?? 0),
     };
+  }
+  async cambiarRegiones(proveedorId: string, extra: RegionId[]) {
+    const yo = await this.obtenerPersona(proveedorId);
+    if (!yo || yo.rol !== 'proveedor') throw new Error('Solo un proveedor elige regiones.');
+    const lista = extra.filter((r, i) => r !== yo.region && extra.indexOf(r) === i);
+    if (lista.length + 1 > PLANES[yo.plan].regiones) throw new Error('Tu plan muestra una sola región. Con el plan Empresa sumás varias.');
+    await updateDoc(doc(this.db, 'users', proveedorId), { regiones: lista, actualizado: serverTimestamp() });
+    this.tocar(undefined);
   }
   /** El plan pago lo activa el equipo al confirmar el cobro: acá queda pedido. */
   async cambiarPlan(proveedorId: string, plan: PlanId) {

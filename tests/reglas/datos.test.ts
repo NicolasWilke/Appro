@@ -25,13 +25,35 @@ const cotizacion = (pedidoId: string, proveedorId: string, cambios: Record<strin
   pedidoId, proveedorId, items: [{ itemId: 'i1', precioUnitario: 15500, descuento: 0, iva: 21 }, { itemId: 'i2', precioUnitario: 90000, descuento: 5, iva: 21 }],
   precioUnitario: 15500, plazoDias: 7, vigencia: '2026-12-15', pago: '30 días fecha factura', nota: '', adjuntos: [], creada: serverTimestamp(), ...cambios,
 });
-/** Como lo hace la app: la oferta y el contador del pedido en un mismo lote. */
-const cotizar = (uid: string, pedidoId = 'PC-1', cambios: Record<string, unknown> = {}) => {
+const mes = () => new Date().toISOString().slice(0, 7);
+/** Como FirestoreRepository.contadorConUnoMas: el contador del mes con una solicitud u oferta más. */
+const conUnoMas = async (db: ReturnType<typeof como>, uid: string, cambio: { ultimaSolicitud: string } | { ultimaOferta: string }) => {
+  const previo = (await getDoc(doc(db, 'usos', uid)).catch(() => null))?.data();
+  const base = previo?.mes === mes() ? previo : { solicitudes: 0, respuestas: 0 };
+  return {
+    ...(previo?.ultimaSolicitud ? { ultimaSolicitud: previo.ultimaSolicitud } : {}),
+    ...(previo?.ultimaOferta ? { ultimaOferta: previo.ultimaOferta } : {}),
+    mes: mes(), solicitudes: base.solicitudes + ('ultimaSolicitud' in cambio ? 1 : 0), respuestas: base.respuestas + ('ultimaOferta' in cambio ? 1 : 0), ...cambio,
+  };
+};
+/** Como lo hace la app: la oferta, el contador del pedido y el del mes en un mismo lote. */
+const cotizar = async (uid: string, pedidoId = 'PC-1', cambios: Record<string, unknown> = {}) => {
   const db = como(uid);
   const lote = writeBatch(db);
   lote.set(doc(db, 'pedidos', pedidoId, 'cotizaciones', uid), cotizacion(pedidoId, uid, cambios));
   lote.update(doc(db, 'pedidos', pedidoId), { ofertas: increment(1) });
+  lote.set(doc(db, 'usos', uid), await conUnoMas(db, uid, { ultimaOferta: pedidoId }));
   return lote.commit();
+};
+/** Como lo hace la app: la solicitud y el contador del mes en un mismo lote. Devuelve el id. */
+const solicitar = async (uid: string, datos: Record<string, unknown> = {}, cuenta = uid) => {
+  const db = como(uid);
+  const ref = doc(collection(db, 'solicitudes'));
+  const lote = writeBatch(db);
+  lote.set(ref, { proveedorId: cuenta, compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp(), ...datos });
+  lote.set(doc(db, 'usos', cuenta), await conUnoMas(db, cuenta, { ultimaSolicitud: ref.id }));
+  await lote.commit();
+  return ref.id;
 };
 const sembrar = (ruta: string, datos: Record<string, unknown>) => env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), ruta), datos); });
 const adjudicacion = (asignacion: Record<string, string>, adjudicados: string[], comentario = '') =>
@@ -65,30 +87,94 @@ const como = (uid: string) => env.authenticatedContext(uid).firestore();
 
 describe('solicitudes de contacto', () => {
   it('el proveedor pide contacto con motivo de 40 a 300 caracteres', async () => {
-    const col = collection(como('prov1'), 'solicitudes');
-    await assertSucceeds(addDoc(col, { proveedorId: 'prov1', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() }));
-    await assertFails(addDoc(col, { proveedorId: 'prov1', compradorId: 'comp1', motivo: 'Hola', estado: 'pendiente', creada: serverTimestamp() }));
+    await assertSucceeds(solicitar('prov1'));
+    await assertFails(solicitar('prov1', { motivo: 'Hola' }));
   });
   it('nadie la crea a nombre de otro, ya aceptada o hacia otro proveedor', async () => {
-    const col = collection(como('prov1'), 'solicitudes');
-    await assertFails(addDoc(col, { proveedorId: 'prov2', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() }));
-    await assertFails(addDoc(col, { proveedorId: 'prov1', compradorId: 'comp1', motivo: MOTIVO, estado: 'aceptada', creada: serverTimestamp() }));
-    await assertFails(addDoc(col, { proveedorId: 'prov1', compradorId: 'prov2', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() }));
-    await assertFails(addDoc(collection(como('comp2'), 'solicitudes'), { proveedorId: 'comp2', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() }));
+    await assertFails(solicitar('prov1', {}, 'prov2'));
+    await assertFails(solicitar('prov1', { proveedorId: 'prov2' }));
+    await assertFails(solicitar('prov1', { estado: 'aceptada' }));
+    await assertFails(solicitar('prov1', { compradorId: 'prov2' }));
+    await assertFails(solicitar('comp2'));
   });
   it('solo el comprador responde y solo cambia el estado', async () => {
-    const ref = await addDoc(collection(como('prov1'), 'solicitudes'), { proveedorId: 'prov1', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() });
-    await assertFails(updateDoc(doc(como('prov1'), 'solicitudes', ref.id), { estado: 'aceptada' }));
-    await assertFails(updateDoc(doc(como('comp2'), 'solicitudes', ref.id), { estado: 'aceptada' }));
-    await assertFails(updateDoc(doc(como('comp1'), 'solicitudes', ref.id), { motivo: 'cambiado por el comprador, que no corresponde hacerlo' }));
-    await assertSucceeds(updateDoc(doc(como('comp1'), 'solicitudes', ref.id), { estado: 'aceptada' }));
+    const id = await solicitar('prov1');
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudes', id), { estado: 'aceptada' }));
+    await assertFails(updateDoc(doc(como('comp2'), 'solicitudes', id), { estado: 'aceptada' }));
+    await assertFails(updateDoc(doc(como('comp1'), 'solicitudes', id), { motivo: 'cambiado por el comprador, que no corresponde hacerlo' }));
+    await assertSucceeds(updateDoc(doc(como('comp1'), 'solicitudes', id), { estado: 'aceptada' }));
   });
   it('cada uno lista solo las suyas', async () => {
-    await addDoc(collection(como('prov1'), 'solicitudes'), { proveedorId: 'prov1', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() });
+    await solicitar('prov1');
     await assertSucceeds(getDocs(query(collection(como('prov1'), 'solicitudes'), where('proveedorId', '==', 'prov1'))));
     await assertSucceeds(getDocs(query(collection(como('comp1'), 'solicitudes'), where('compradorId', '==', 'comp1'))));
     await assertFails(getDocs(query(collection(como('prov2'), 'solicitudes'), where('compradorId', '==', 'comp1'))));
     await assertFails(getDocs(collection(como('prov1'), 'solicitudes')));
+  });
+});
+
+describe('cupo del plan en las reglas', () => {
+  it('sin el contador del mes no se crea la solicitud', async () => {
+    await assertFails(addDoc(collection(como('prov1'), 'solicitudes'), { proveedorId: 'prov1', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() }));
+  });
+  it('Gratis: la cuarta solicitud del mes se rechaza', async () => {
+    for (let i = 0; i < 3; i++) await assertSucceeds(solicitar('prov2'));
+    await assertFails(solicitar('prov2'));
+  });
+  it('Pro: 25 solicitudes; Empresa: 80 (se prueba el borde con el contador sembrado)', async () => {
+    await sembrar('usos/prov1', { mes: mes(), solicitudes: 24, respuestas: 0 });
+    await assertSucceeds(solicitar('prov1'));
+    await assertFails(solicitar('prov1'));
+    await sembrar('estado/prov3', { plan: 'empresa' });
+    await sembrar('usos/prov3', { mes: mes(), solicitudes: 79, respuestas: 0 });
+    await assertSucceeds(solicitar('prov3'));
+    await assertFails(solicitar('prov3'));
+  });
+  it('el contador de un mes anterior arranca de cero', async () => {
+    await sembrar('usos/prov2', { mes: '2020-01', solicitudes: 3, respuestas: 3 });
+    await assertSucceeds(solicitar('prov2'));
+  });
+  it('nadie baja el contador, salta de a dos ni lo sube sin una solicitud nueva', async () => {
+    const id = await solicitar('prov2');
+    const db = como('prov2');
+    await assertFails(setDoc(doc(db, 'usos', 'prov2'), { mes: mes(), solicitudes: 0, respuestas: 0, ultimaSolicitud: id }));
+    const ref = doc(collection(db, 'solicitudes'));
+    const lote = writeBatch(db);
+    lote.set(ref, { proveedorId: 'prov2', compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() });
+    lote.set(doc(db, 'usos', 'prov2'), { mes: mes(), solicitudes: 1, respuestas: 0, ultimaSolicitud: ref.id });
+    await assertFails(lote.commit());
+    await assertFails(setDoc(doc(db, 'usos', 'prov2'), { mes: mes(), solicitudes: 2, respuestas: 0, ultimaSolicitud: id }));
+    await assertFails(setDoc(doc(como('prov1'), 'usos', 'prov2'), { mes: mes(), solicitudes: 0, respuestas: 0, ultimaSolicitud: 'x' }));
+    await assertFails(getDoc(doc(como('prov1'), 'usos', 'prov2')));
+  });
+  it('Gratis: tres ofertas por mes; Pro sin límite', async () => {
+    await sembrar('usos/prov2', { mes: mes(), solicitudes: 0, respuestas: 3 });
+    await assertFails(cotizar('prov2'));
+    await sembrar('usos/prov1', { mes: mes(), solicitudes: 0, respuestas: 40 });
+    await assertSucceeds(cotizar('prov1'));
+  });
+  it('sin el contador del mes no se cotiza', async () => {
+    const db = como('prov1');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'pedidos', 'PC-1', 'cotizaciones', 'prov1'), cotizacion('PC-1', 'prov1'));
+    lote.update(doc(db, 'pedidos', 'PC-1'), { ofertas: increment(1) });
+    await assertFails(lote.commit());
+  });
+});
+
+describe('regiones por plan', () => {
+  it('Gratis y Pro no suman regiones; Empresa suma hasta cuatro', async () => {
+    await assertFails(updateDoc(doc(como('prov1'), 'users', 'prov1'), { regiones: ['amba'] }));
+    await assertSucceeds(updateDoc(doc(como('prov1'), 'users', 'prov1'), { regiones: [] }));
+    await sembrar('estado/prov3', { plan: 'empresa' });
+    await assertSucceeds(updateDoc(doc(como('prov3'), 'users', 'prov3'), { regiones: ['amba', 'cba', 'noa', 'costa'] }));
+    await assertFails(updateDoc(doc(como('prov3'), 'users', 'prov3'), { regiones: ['amba', 'cba', 'noa', 'costa', 'ros'] }));
+    await assertFails(updateDoc(doc(como('prov3'), 'users', 'prov3'), { regiones: ['marte'] }));
+  });
+  it('si baja de plan puede seguir editando su perfil sin perder lo guardado', async () => {
+    await sembrar('users/prov2', { ...perfil('proveedor'), regiones: ['amba', 'cba'] });
+    await assertSucceeds(updateDoc(doc(como('prov2'), 'users', 'prov2'), { sector: 'Seguridad privada' }));
+    await assertFails(updateDoc(doc(como('prov2'), 'users', 'prov2'), { regiones: ['amba', 'cba', 'noa'] }));
   });
 });
 
@@ -173,6 +259,7 @@ describe('ofertas', () => {
     const lote = writeBatch(db);
     lote.set(doc(db, 'pedidos', 'PC-1', 'cotizaciones', 'prov2'), cotizacion('PC-1', 'prov2'));
     lote.update(doc(db, 'pedidos', 'PC-1'), { ofertas: increment(1) });
+    lote.set(doc(db, 'usos', 'prov2'), { mes: mes(), solicitudes: 0, respuestas: 1, ultimaOferta: 'PC-1' });
     await assertFails(lote.commit());
     await assertFails(cotizar('prov1', 'PC-1', { items: [{ itemId: 'i1', precioUnitario: 15500, descuento: 0, iva: 21 }] }));
   });

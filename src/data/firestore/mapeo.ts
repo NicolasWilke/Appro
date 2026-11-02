@@ -3,6 +3,7 @@ import type {
   Comprador, Cotizacion, FrecuenciaAvisos, ItemPedido, Persona, PedidoCotizacion, PlanId, Proveedor, Resena, RubroId, SolicitudContacto, Verificaciones,
 } from '@/domain/types';
 import { cierreIso, isoArgentina, itemsCotizadosDe, itemsDe } from '@/domain/rfq';
+import { coberturaDe, regionesVisibles } from '@/domain/planes';
 
 /**
  * De documentos de Firestore a los tipos del dominio. Sin dependencias del SDK:
@@ -38,9 +39,10 @@ export function aPersona(id: string, d: Datos, e: Estado = {}): Persona {
     };
     return c;
   }
+  const plan = e.plan ?? 'gratis';
   const p: Proveedor = {
-    ...base, rol: 'proveedor', plan: e.plan ?? 'gratis', desde: d.creado ? Number(fechaIso(d.creado).slice(0, 4)) : new Date().getFullYear(),
-    empleados: '', certificaciones: e.certificaciones ?? [], catalogo: d.sector ? [d.sector] : [], cobertura: { [region]: 100 }, resenas: [],
+    ...base, rol: 'proveedor', plan, desde: d.creado ? Number(fechaIso(d.creado).slice(0, 4)) : new Date().getFullYear(),
+    empleados: '', certificaciones: e.certificaciones ?? [], catalogo: d.sector ? [d.sector] : [], cobertura: coberturaDe(regionesVisibles(plan, region, d.regiones ?? [])), resenas: [],
     avisos: (d.avisos ?? 'inmediato') as FrecuenciaAvisos,
   };
   return p;

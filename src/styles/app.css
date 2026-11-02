@@ -742,3 +742,4 @@ textarea { resize: vertical; line-height: 1.5; }
 @media (max-width: 900px) { .app:has(.barra-movil) .instalar { bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)); } }
 @media print { .instalar { display: none !important; } }
 @media (prefers-reduced-motion: no-preference) { .instalar { animation: subir-instalar .3s ease-out; } @keyframes subir-instalar { from { transform: translate(-50%, 12px); opacity: 0; } } }
+.lista-regiones { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0.5rem; }
