@@ -3,6 +3,7 @@ import { Privacidad, Terminos } from '@/features/legal/Legal';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Landing } from '@/features/landing/Landing';
 import { Acceso } from '@/features/acceso/Acceso';
+import { Unirse } from '@/features/acceso/Unirse';
 import { MiPerfil } from '@/features/cuenta/MiPerfil';
 import { Directorio } from '@/features/red/Directorio';
 import { Perfil } from '@/features/red/Perfil';
@@ -34,6 +35,7 @@ const rutas = (
     <Route index element={<Landing />} />
     <Route path="ingresar" element={<Acceso />} />
     <Route path="registro" element={<RedirigirRegistro />} />
+    <Route path="unirse" element={<Unirse />} />
     <Route path="planes" element={<Planes />} />
     <Route path="terminos" element={<Terminos />} />
     <Route path="privacidad" element={<Privacidad />} />

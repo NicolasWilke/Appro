@@ -25,3 +25,8 @@ export const coberturaDe = (regiones: RegionId[]) => Object.fromEntries(regiones
 
 /** Mes del cupo, en UTC: el mismo que calculan las reglas de Firestore con request.time. */
 export const mesCupo = (ahora = new Date()) => ahora.toISOString().slice(0, 7);
+
+/** Días que dura un enlace para sumarse al equipo (lo mismo exigen las reglas). */
+export const DIAS_INVITACION = 7;
+/** Lugares para sumar gente al equipo, sin contar al titular. */
+export const lugaresEquipo = (plan: PlanId) => Math.max(0, PLANES[plan].usuarios - 1);

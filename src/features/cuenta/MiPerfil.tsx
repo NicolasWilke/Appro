@@ -5,12 +5,12 @@ import { prepararLogo } from '@/auth/imagen';
 import { FalloAuth, MENSAJES_FALLO, type CambiosPerfil, type ContactoCuenta } from '@/auth/tipos';
 import { REGION } from '@/config/region';
 import { REGIONES, RUBROS, region, rubro } from '@/domain/catalogos';
-import { PLANES } from '@/domain/planes';
+import { DIAS_INVITACION, lugaresEquipo, PLANES } from '@/domain/planes';
 import type { Proveedor, RegionId, RubroId } from '@/domain/types';
 import { useQuery, useRepo } from '@/data/DataProvider';
 import { esMailValido } from '@/domain/validaciones';
 import { t } from '@/i18n';
-import { Pill, Seccion } from '@/ui/primitivas';
+import { Copiable, Pill, Seccion } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
 
 const mensaje = (e: unknown) => (e instanceof FalloAuth ? MENSAJES_FALLO[e.codigo] : e instanceof Error ? e.message : MENSAJES_FALLO.desconocido);
@@ -22,7 +22,9 @@ export function MiPerfil() {
   const avisar = useToast();
   const c = cuenta!;
   const p = c.perfil;
-  const [editando, setEditando] = useState(params.get('editar') === '1');
+  // Un miembro del equipo ve el perfil de la empresa, pero lo edita el titular.
+  const miembro = c.miembro;
+  const [editando, setEditando] = useState(params.get('editar') === '1' && !miembro);
 
   return (
     <div className="envoltura pagina mi-perfil">
@@ -30,7 +32,7 @@ export function MiPerfil() {
         <p className="nota mi-perfil__bienvenida">Tu cuenta está lista. Sumá el logo de tu empresa para que te reconozcan en la red.</p>
       )}
       <header className="mi-perfil__cab">
-        <Logo />
+        {miembro ? <LogoFijo /> : <Logo />}
         <div>
           <p className="eyebrow">{t.rol[p.rol]} · {rubro(p.categoria).nombre}</p>
           <h1>{p.empresa}</h1>
@@ -43,7 +45,7 @@ export function MiPerfil() {
           {editando
             ? <Edicion alTerminar={() => setEditando(false)} />
             : (
-              <Seccion titulo="Datos de la empresa" extra={<button className="btn btn--sec btn--chico" onClick={() => setEditando(true)}>Editar</button>}>
+              <Seccion titulo="Datos de la empresa" extra={miembro ? undefined : <button className="btn btn--sec btn--chico" onClick={() => setEditando(true)}>Editar</button>}>
                 <dl className="datos">
                   <div><dt>Empresa</dt><dd>{p.empresa}</dd></div>
                   <div><dt>Nombre de contacto</dt><dd>{p.contactoNombre}</dd></div>
@@ -58,7 +60,14 @@ export function MiPerfil() {
             )}
         </div>
         <div className="mi-perfil__lateral">
-          {p.rol === 'proveedor' && <Regiones />}
+          {miembro && (
+            <Seccion titulo="Tu usuario">
+              <p>Sos parte del equipo de <strong>{p.empresa}</strong> como {miembro.nombre}. Cotizás y pedís contactos a nombre de la empresa.</p>
+              <p className="tenue">Los datos de la empresa, el plan y el equipo los maneja el titular de la cuenta.</p>
+            </Seccion>
+          )}
+          {p.rol === 'proveedor' && !miembro && <Equipo />}
+          {p.rol === 'proveedor' && !miembro && <Regiones />}
           <Seccion titulo="Quién ve tu contacto">
             <p>{p.rol === 'comprador'
               ? 'Tu mail y teléfono los ve solo el proveedor cuya solicitud aceptás. Otros compradores, no.'
@@ -78,6 +87,89 @@ export function MiPerfil() {
           <Link className="enlace" to={`/red/${c.uid}`}>Ver cómo me ven en la red</Link>
           <EnlaceAdmin />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Equipo del plan Empresa: el titular invita con enlaces de un solo uso y saca a quien ya no corresponde. */
+function Equipo() {
+  const { cuenta } = useAuth();
+  const repo = useRepo();
+  const avisar = useToast();
+  const uid = cuenta!.uid;
+  const { data } = useQuery(async (r) => {
+    const yo = (await r.obtenerPersona(uid)) as Proveedor | null;
+    return { yo, equipo: yo?.plan === 'empresa' ? await r.equipo(uid) : null };
+  }, [uid]);
+  const [etiqueta, setEtiqueta] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  if (!data?.yo) return null;
+  const lugares = lugaresEquipo(data.yo.plan);
+  const enlace = (codigo: string) => `${window.location.origin}/unirse?codigo=${codigo}`;
+  const hacer = async (fn: () => Promise<unknown>, ok: string) => {
+    setOcupado(true);
+    try { await fn(); avisar(ok); } catch (e) { avisar(mensaje(e), 'error'); } finally { setOcupado(false); }
+  };
+
+  if (!data.equipo) {
+    return (
+      <Seccion titulo="Tu equipo">
+        <p>Hoy entrás solo vos.</p>
+        <p className="tenue">Con el plan Empresa sumás hasta {PLANES.empresa.usuarios - 1} personas de tu equipo comercial, cada una con su usuario, y comparten el cupo de la empresa.</p>
+        <Link className="enlace" to="/planes">Ver planes</Link>
+      </Seccion>
+    );
+  }
+  const { miembros, invitaciones } = data.equipo;
+  const libres = lugares - miembros.length - invitaciones.length;
+  return (
+    <Seccion titulo="Tu equipo" extra={<Pill tono="neutro">{miembros.length + 1} de {lugares + 1}</Pill>}>
+      <ul className="lista-equipo">
+        <li><strong>{cuenta!.perfil.contactoNombre}</strong> <span className="tenue">· titular</span></li>
+        {miembros.map((m) => (
+          <li key={m.uid}>
+            <span><strong>{m.nombre}</strong> <span className="tenue">· {m.email}</span></span>
+            <button className="enlace" disabled={ocupado} onClick={() => window.confirm(`¿Sacar a ${m.nombre} del equipo? Pierde el acceso enseguida.`)
+              && hacer(() => repo.quitarDelEquipo(uid, m.uid), `${m.nombre} ya no es parte del equipo.`)}>Quitar</button>
+          </li>
+        ))}
+      </ul>
+      {invitaciones.length > 0 && (
+        <>
+          <h3 className="sub">Enlaces sin usar</h3>
+          <ul className="lista-equipo">
+            {invitaciones.map((i) => (
+              <li key={i.codigo} className="lista-equipo__invitacion">
+                <span>{i.etiqueta || 'Sin nombre'} <span className="tenue">· vence el {i.vence.split('-').reverse().join('/')}</span></span>
+                <Copiable texto={enlace(i.codigo)} etiqueta="Enlace" />
+                <button className="enlace" disabled={ocupado} onClick={() => hacer(() => repo.cancelarInvitacion(i.codigo), 'Enlace cancelado.')}>Cancelar</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {libres > 0 ? (
+        <form className="form" onSubmit={(e) => { e.preventDefault(); hacer(async () => { await repo.invitarAlEquipo(uid, etiqueta); setEtiqueta(''); }, 'Enlace creado. Copialo y mandáselo por mail o WhatsApp.'); }}>
+          <label className="campo" htmlFor="eq-etiqueta"><span>¿Para quién es? (opcional)</span>
+            <input id="eq-etiqueta" placeholder="Ej.: Martina, ventas zona norte" value={etiqueta} maxLength={80} onChange={(e) => setEtiqueta(e.target.value)} />
+          </label>
+          <button className="btn btn--sec btn--chico" disabled={ocupado}>Crear enlace de invitación</button>
+          <p className="tenue">El enlace sirve para una sola persona y vence a los {DIAS_INVITACION} días.</p>
+        </form>
+      ) : <p className="tenue">El equipo está completo. Para sumar a alguien, quitá a otra persona o cancelá un enlace.</p>}
+    </Seccion>
+  );
+}
+
+/** El logo sin controles: lo cambia el titular. */
+function LogoFijo() {
+  const { cuenta } = useAuth();
+  const p = cuenta!.perfil;
+  return (
+    <div className="logo-empresa">
+      <div className="logo-empresa__marco">
+        {p.logoUrl ? <img src={p.logoUrl} alt={`Logo de ${p.empresa}`} /> : <span className="logo-empresa__vacio">Sin logo</span>}
       </div>
     </div>
   );

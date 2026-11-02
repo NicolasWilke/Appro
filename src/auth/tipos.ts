@@ -20,10 +20,18 @@ export interface AltaCuenta extends Omit<PerfilCuenta, 'uid' | 'logoUrl'>, Conta
 
 export type CambiosPerfil = Partial<Pick<PerfilCuenta, 'empresa' | 'contactoNombre' | 'categoria' | 'sector' | 'ubicacion'>>;
 
-/** Usuario con sesión iniciada. `email` es el de ingreso; el de contacto puede ser otro. */
-export interface Cuenta { uid: string; email: string; perfil: PerfilCuenta; contacto: ContactoCuenta }
+/**
+ * Usuario con sesión iniciada. `email` es el de ingreso; el de contacto puede ser otro.
+ * Si es parte del equipo de un proveedor Empresa, `uid`, `perfil` y `contacto` son los de la empresa
+ * (actúa por ella) y `miembro` dice quién es la persona.
+ */
+export interface Cuenta { uid: string; email: string; perfil: PerfilCuenta; contacto: ContactoCuenta; miembro?: { uid: string; nombre: string } }
 
-export type CodigoFallo = 'mail-en-uso' | 'credenciales' | 'password-debil' | 'demasiados-intentos' | 'red' | 'sin-permiso' | 'desconocido';
+/** Lo que ve quien abre un enlace para sumarse a un equipo. */
+export interface InvitacionEquipo { codigo: string; empresaId: string; empresa: string; vence: string }
+export interface AltaMiembro { nombre: string; email: string; password: string }
+
+export type CodigoFallo = 'mail-en-uso' | 'credenciales' | 'password-debil' | 'demasiados-intentos' | 'red' | 'sin-permiso' | 'sin-equipo' | 'sin-perfil' | 'invitacion-invalida' | 'desconocido';
 
 export class FalloAuth extends Error {
   constructor(public codigo: CodigoFallo) { super(codigo); }
@@ -36,6 +44,9 @@ export const MENSAJES_FALLO: Record<CodigoFallo, string> = {
   'demasiados-intentos': 'Demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.',
   red: 'No hay conexión. Revisá internet y probá de nuevo.',
   'sin-permiso': 'No tenés permiso para hacer eso.',
+  'sin-equipo': 'Tu empresa ya no tiene el plan Empresa, así que el equipo quedó en pausa. Pedile al titular que lo renueve.',
+  'sin-perfil': 'Tu usuario no tiene una empresa asociada. Si eras parte de un equipo, pedile al titular que te vuelva a invitar.',
+  'invitacion-invalida': 'Este enlace ya se usó, venció o el equipo está completo. Pedile uno nuevo a quien te invitó.',
   desconocido: 'Algo falló. Probá de nuevo en un momento.',
 };
 
@@ -62,4 +73,8 @@ export interface AuthService {
   aceptarProveedor(proveedorUid: string): Promise<void>;
   /** Contacto de otro usuario, si las reglas lo permiten. null si no existe o no hay permiso. */
   contactoDe(uid: string): Promise<ContactoCuenta | null>;
+  /** Invitación a un equipo, o null si no existe o venció. No hace falta sesión. */
+  leerInvitacion(codigo: string): Promise<InvitacionEquipo | null>;
+  /** Crea el usuario y lo suma al equipo con la invitación (que se consume). Queda con sesión iniciada. */
+  unirseAEquipo(codigo: string, alta: AltaMiembro): Promise<Cuenta>;
 }

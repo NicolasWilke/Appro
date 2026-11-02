@@ -1,5 +1,5 @@
 import type {
-  Antecedente, Comprador, CuentaAdmin, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
+  Antecedente, Comprador, CuentaAdmin, InvitacionPendiente, MiembroEquipo, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
   Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
@@ -99,6 +99,13 @@ export interface Repository {
   /** 'activo': se aplicó ya (demo). 'solicitado': lo activa el equipo al confirmar el cobro. */
   cambiarPlan(proveedorId: string, plan: PlanId): Promise<'activo' | 'solicitado'>;
   embudo(proveedorId: string): Promise<Embudo>;
+  /** Equipo del plan Empresa: quiénes se sumaron y qué enlaces siguen sin usar. Lo ve el titular. */
+  equipo(empresaId: string): Promise<{ miembros: MiembroEquipo[]; invitaciones: InvitacionPendiente[] }>;
+  /** El titular crea un enlace de un solo uso. `etiqueta` le recuerda para quién era. */
+  invitarAlEquipo(empresaId: string, etiqueta: string): Promise<InvitacionPendiente>;
+  cancelarInvitacion(codigo: string): Promise<void>;
+  /** El titular saca a alguien del equipo: pierde el acceso enseguida. */
+  quitarDelEquipo(empresaId: string, uid: string): Promise<void>;
   /** Regiones que el proveedor suma a la principal. Más de una solo con el plan Empresa. */
   cambiarRegiones(proveedorId: string, extra: RegionId[]): Promise<void>;
 

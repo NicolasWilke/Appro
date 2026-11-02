@@ -2,7 +2,7 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Antecedente, Comprador, CuentaAdmin, PlanId, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, RegionId, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Antecedente, Comprador, CuentaAdmin, InvitacionPendiente, PlanId, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, RegionId, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
 import { PLANES } from '@/domain/planes';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { antecedentesDe, antiguedad, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
@@ -395,6 +395,17 @@ export class MockRepository implements Repository {
     this.guardar();
     return 'activo' as const;
   }
+  /** La demo no tiene cuentas reales que sumar: los enlaces se crean pero no se pueden usar. */
+  private invitaciones: InvitacionPendiente[] = [];
+  async equipo() { return { miembros: [], invitaciones: [...this.invitaciones] }; }
+  async invitarAlEquipo(_empresaId: string, etiqueta: string) {
+    const inv = { codigo: `inv-demo-${Date.now().toString(36)}`, etiqueta, creada: hoy(), vence: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10) };
+    this.invitaciones.push(inv);
+    this.guardar();
+    return inv;
+  }
+  async cancelarInvitacion(codigo: string) { this.invitaciones = this.invitaciones.filter((i) => i.codigo !== codigo); this.guardar(); }
+  async quitarDelEquipo() {}
   async cambiarRegiones(proveedorId: string, extra: RegionId[]) {
     const p = this.proveedor(proveedorId);
     const lista = [p.region, ...extra.filter((r) => r !== p.region)];

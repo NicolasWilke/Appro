@@ -25,6 +25,7 @@ export function Planes() {
 
   const elegir = async (id: PlanId) => {
     if (!cuenta) { ir('/ingresar?modo=registro&rol=proveedor'); return; }
+    if (cuenta.miembro) { avisar(`El plan lo cambia el titular de la cuenta de ${cuenta.perfil.empresa}.`, 'info'); return; }
     if (!esProveedor) { avisar('Los planes pagos son para proveedores. Como comprador usás la red gratis.', 'info'); return; }
     const resultado = await repo.cambiarPlan(cuenta.uid, id);
     avisar(resultado === 'activo'

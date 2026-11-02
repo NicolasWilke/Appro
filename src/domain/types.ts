@@ -247,6 +247,11 @@ export interface CuentaAdmin {
   pedido: { plan: PlanId; fecha: string } | null;
 }
 
+/** Usuario del equipo comercial de un proveedor Empresa. */
+export interface MiembroEquipo { uid: string; nombre: string; email: string; desde: string }
+/** Enlace de un solo uso para sumarse al equipo; vence a los 7 días. */
+export interface InvitacionPendiente { codigo: string; etiqueta: string; creada: string; vence: string }
+
 export interface Uso { solicitudesUsadas: number; respuestasUsadas: number }
 
 export interface Embudo {

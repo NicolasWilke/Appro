@@ -5,11 +5,12 @@ import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import type {
-  Antecedente, Comprador, CuentaAdmin, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, Uso, ValorReferencia,
+  Antecedente, Comprador, CuentaAdmin, InvitacionPendiente, MiembroEquipo, EscalaConvenio, Indicador, Consulta, DatosCuenta, Embudo, SolicitudValor, FiltroRed, FrecuenciaAvisos, Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, Uso, ValorReferencia,
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { textoBuscable } from '@/domain/directorio';
-import { mesCupo, PLANES } from '@/domain/planes';
+import { DIAS_INVITACION, lugaresEquipo, mesCupo, PLANES } from '@/domain/planes';
+import { empresaDeSesion } from './sesionEmpresa';
 import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, preciosVisibles, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
 import { aCotizacion, aPedido, aPersona, aResena, aSolicitud, fechaIso, hoyIso, inicioMes, ventanaAbierta, type Estado } from './mapeo';
@@ -42,10 +43,11 @@ export class FirestoreRepository implements Repository {
 
   private tocar<T>(x: T) { this.oyentes.forEach((f) => f()); return x; }
 
+  /** La cuenta por la que actúa la sesión: la empresa, si es un miembro de su equipo. */
   private yo() {
     const u = this.auth.currentUser;
     if (!u) throw new Error('Sin sesión');
-    return u.uid;
+    return empresaDeSesion() ?? u.uid;
   }
 
   private async estados(): Promise<Map<string, Estado>> {
@@ -319,7 +321,7 @@ export class FirestoreRepository implements Repository {
     const { id, ...datos } = v;
     // Firestore no acepta undefined: se omiten los campos opcionales vacíos.
     const limpio = Object.fromEntries(Object.entries(datos).filter(([, x]) => x !== undefined));
-    await setDoc(doc(this.db, 'valoresReferencia', id), { ...limpio, actualizado: serverTimestamp(), actualizadoPor: this.yo() });
+    await setDoc(doc(this.db, 'valoresReferencia', id), { ...limpio, actualizado: serverTimestamp(), actualizadoPor: this.auth.currentUser!.uid });
     this.tocar(undefined);
   }
   async indicadores() {
@@ -437,6 +439,47 @@ export class FirestoreRepository implements Repository {
       solicitudesUsadas: Math.max(sol.filter((s) => s.creada >= desde).length, delMes?.solicitudes ?? 0),
       respuestasUsadas: Math.max(cot.docs.filter((d) => fechaIso(d.data().creada) >= desde).length, delMes?.respuestas ?? 0),
     };
+  }
+  // ── Equipo del plan Empresa (miembros/{uid}, equipos/{empresa}, invitaciones/{codigo})
+  async equipo(empresaId: string) {
+    const [m, i] = await Promise.all([
+      getDocs(query(collection(this.db, 'miembros'), where('empresaId', '==', empresaId))),
+      getDocs(query(collection(this.db, 'invitaciones'), where('empresaId', '==', empresaId))),
+    ]);
+    const vence = (creada: string) => new Date(new Date(`${creada}T12:00:00Z`).getTime() + DIAS_INVITACION * 86400000).toISOString().slice(0, 10);
+    return {
+      miembros: m.docs.map((d): MiembroEquipo => ({ uid: d.id, nombre: d.data().nombre, email: d.data().email, desde: fechaIso(d.data().desde) }))
+        .sort((a, b) => a.desde.localeCompare(b.desde)),
+      invitaciones: i.docs.map((d): InvitacionPendiente => {
+        const creada = fechaIso(d.data().creada);
+        return { codigo: d.id, etiqueta: d.data().etiqueta ?? '', creada, vence: vence(creada) };
+      }).filter((x) => x.vence >= hoyIso()).sort((a, b) => a.creada.localeCompare(b.creada)),
+    };
+  }
+  async invitarAlEquipo(empresaId: string, etiqueta: string) {
+    const [yo, actual] = await Promise.all([this.obtenerPersona(empresaId), this.equipo(empresaId)]);
+    if (!yo || yo.rol !== 'proveedor' || yo.plan !== 'empresa') throw new Error('El equipo es parte del plan Empresa.');
+    if (actual.miembros.length + actual.invitaciones.length >= lugaresEquipo(yo.plan)) throw new Error(`Tu equipo tiene lugar para ${lugaresEquipo(yo.plan)} personas además de vos. Quitá a alguien o cancelá un enlace sin usar.`);
+    // Código largo y al azar: es la llave para entrar, no se puede adivinar.
+    const azar = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(36).padStart(2, '0')).join('');
+    const codigo = `inv-${azar}`;
+    await setDoc(doc(this.db, 'invitaciones', codigo), { empresaId, empresa: yo.empresa, etiqueta: etiqueta.trim().slice(0, 80), creada: serverTimestamp() });
+    this.tocar(undefined);
+    return { codigo, etiqueta: etiqueta.trim(), creada: hoyIso(), vence: new Date(Date.now() + DIAS_INVITACION * 86400000).toISOString().slice(0, 10) };
+  }
+  async cancelarInvitacion(codigo: string) {
+    await deleteDoc(doc(this.db, 'invitaciones', codigo));
+    this.tocar(undefined);
+  }
+  async quitarDelEquipo(empresaId: string, uid: string) {
+    const ref = doc(this.db, 'equipos', empresaId);
+    const lista = ((await getDoc(ref)).data()?.miembros ?? []) as string[];
+    // El miembro sale de la lista y pierde su acceso en el mismo lote.
+    const lote = writeBatch(this.db);
+    lote.delete(doc(this.db, 'miembros', uid));
+    lote.set(ref, { miembros: lista.filter((x) => x !== uid), ultimoQuitado: uid });
+    await lote.commit();
+    this.tocar(undefined);
   }
   async cambiarRegiones(proveedorId: string, extra: RegionId[]) {
     const yo = await this.obtenerPersona(proveedorId);

@@ -60,7 +60,7 @@ export function PanelProveedor() {
       <header className="panel__cab">
         <div>
           <p className="eyebrow">Panel de proveedor · {yo.empresa}</p>
-          <h1>Hola, {yo.nombre}</h1>
+          <h1>Hola, {cuenta?.miembro ? cuenta.miembro.nombre.split(" ")[0] : yo.nombre}</h1>
         </div>
         <div className="plan-actual">
           <span>Plan <strong>{plan.nombre}</strong></span>
@@ -117,6 +117,7 @@ export function PanelProveedor() {
           <PedidosDeValor />
           <Seccion titulo="Avisos de pedidos nuevos">
             <p className="tenue">Te llegan a {cuenta?.contacto.email} los pedidos de tus rubros.</p>
+            {cuenta?.miembro ? <p className="tenue">Los avisos los configura el titular de la cuenta.</p> : (
             <div className="segmento segmento--ancho segmento--apilable" role="group" aria-label="Frecuencia de avisos">
               {([['inmediato', 'Un mail por pedido'], ['diario', 'Resumen diario'], ['pausado', 'Pausar']] as [FrecuenciaAvisos, string][]).map(([f, txt]) => (
                 <button key={f} type="button" aria-pressed={yo.avisos === f} className={yo.avisos === f ? 'is-activo' : ''}
@@ -125,6 +126,7 @@ export function PanelProveedor() {
                 </button>
               ))}
             </div>
+            )}
           </Seccion>
           <Seccion titulo="Tus solicitudes">
             {enviadas.length === 0 && <p className="tenue">Todavía no pediste contacto a ningún comprador. Cuando lo hagas, acá ves si te aceptó y sus datos.</p>}

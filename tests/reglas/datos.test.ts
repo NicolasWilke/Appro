@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
-  addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc, where, writeBatch,
+  addDoc, arrayUnion, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 setLogLevel('silent');
@@ -43,6 +43,21 @@ const cotizar = async (uid: string, pedidoId = 'PC-1', cambios: Record<string, u
   lote.set(doc(db, 'pedidos', pedidoId, 'cotizaciones', uid), cotizacion(pedidoId, uid, cambios));
   lote.update(doc(db, 'pedidos', pedidoId), { ofertas: increment(1) });
   lote.set(doc(db, 'usos', uid), await conUnoMas(db, uid, { ultimaOferta: pedidoId }));
+  return lote.commit();
+};
+/** Un miembro de un equipo cotiza a nombre de la empresa. */
+const cotizarComo = async (_uid: string, empresa: string, pedidoId: string, db: ReturnType<typeof como>) => {
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'pedidos', pedidoId, 'cotizaciones', empresa), cotizacion(pedidoId, empresa));
+  lote.update(doc(db, 'pedidos', pedidoId), { ofertas: increment(1) });
+  lote.set(doc(db, 'usos', empresa), await conUnoMas(db, empresa, { ultimaOferta: pedidoId }));
+  return lote.commit();
+};
+const solicitarComo = async (db: ReturnType<typeof como>, empresa: string) => {
+  const ref = doc(collection(db, 'solicitudes'));
+  const lote = writeBatch(db);
+  lote.set(ref, { proveedorId: empresa, compradorId: 'comp1', motivo: MOTIVO, estado: 'pendiente', creada: serverTimestamp() });
+  lote.set(doc(db, 'usos', empresa), await conUnoMas(db, empresa, { ultimaSolicitud: ref.id }));
   return lote.commit();
 };
 /** Como lo hace la app: la solicitud y el contador del mes en un mismo lote. Devuelve el id. */
@@ -556,5 +571,84 @@ describe('centro de referencias', () => {
     await assertFails(setDoc(doc(como('prov3'), 'indicadores', 'ipc'), indicador({ grupo: 'otro' })));
     await assertFails(setDoc(doc(como('prov3'), 'escalas', 'upsra'), { periodo: 'septiembre', categorias: [] }));
     await assertSucceeds(setDoc(doc(como('prov3'), 'escalas', 'upsra'), { actividad: 'Vigilancia', convenio: 'CCT 507/07', periodo: '2026-10', fuente: { nombre: 'UPSRA', url: '' }, categorias: [], actualizado: '2026-11-01' }));
+  });
+});
+
+describe('equipo del plan Empresa', () => {
+  const CODIGO = 'inv-abcdefghijklmnopqrstu';
+  const comoMiembro = (uid: string) => env.authenticatedContext(uid, { email: `${uid}@prov3.com.ar` }).firestore();
+  const invitar = (codigo = CODIGO, quien = 'prov3') => setDoc(doc(como(quien), 'invitaciones', codigo), { empresaId: quien, empresa: 'Empresa proveedor', etiqueta: 'Ventas', creada: serverTimestamp() });
+  const unirse = (uid: string, codigo = CODIGO, empresa = 'prov3') => {
+    const db = comoMiembro(uid);
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'miembros', uid), { empresaId: empresa, nombre: 'Vendedor Uno', email: `${uid}@prov3.com.ar`, invitacion: codigo, desde: serverTimestamp() });
+    lote.set(doc(db, 'equipos', empresa), { miembros: arrayUnion(uid) }, { merge: true });
+    lote.delete(doc(db, 'invitaciones', codigo));
+    return lote.commit();
+  };
+  beforeEach(async () => { await sembrar('estado/prov3', { plan: 'empresa' }); });
+
+  it('solo el titular de un plan Empresa invita', async () => {
+    await assertSucceeds(invitar());
+    await assertFails(invitar('inv-zzzzzzzzzzzzzzzzzzzzzz', 'prov1'));
+    await assertFails(setDoc(doc(como('prov1'), 'invitaciones', 'inv-yyyyyyyyyyyyyyyyyyyyyy'), { empresaId: 'prov3', empresa: 'X X', etiqueta: '', creada: serverTimestamp() }));
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), 'invitaciones', CODIGO)));
+    await assertSucceeds(getDocs(query(collection(como('prov3'), 'invitaciones'), where('empresaId', '==', 'prov3'))));
+    await assertFails(getDocs(collection(como('prov1'), 'invitaciones')));
+  });
+  it('quien se suma consume la invitación y actúa por la empresa', async () => {
+    await invitar();
+    await assertSucceeds(unirse('m1'));
+    await assertFails(unirse('m2'));
+    await sembrar('pedidos/PC-P', { ...pedido('comp1', { privado: true, invitados: ['prov3'] }), creado: new Date() });
+    const db = comoMiembro('m1');
+    await assertSucceeds(getDoc(doc(db, 'users', 'comp1')));
+    await assertSucceeds(getDocs(query(collection(db, 'pedidos'), where('invitados', 'array-contains', 'prov3'))));
+    await assertSucceeds(cotizarComo('m1', 'prov3', 'PC-P', db));
+    await assertSucceeds(solicitarComo(db, 'prov3'));
+    await assertSucceeds(getDocs(query(collection(db, 'solicitudes'), where('proveedorId', '==', 'prov3'))));
+    await assertSucceeds(getDocs(query(collectionGroup(db, 'cotizaciones'), where('proveedorId', '==', 'prov3'))));
+    await assertSucceeds(getDoc(doc(db, 'usos', 'prov3')));
+    await assertSucceeds(getDoc(doc(db, 'equipos', 'prov3')));
+  });
+  it('un miembro no edita el perfil, no pide planes, no invita ni actúa por otra empresa', async () => {
+    await invitar();
+    await unirse('m1');
+    const db = comoMiembro('m1');
+    await assertFails(updateDoc(doc(db, 'users', 'prov3'), { sector: 'Otro' }));
+    await assertFails(setDoc(doc(db, 'solicitudesPlan', 'prov3'), { plan: 'pro', pedido: serverTimestamp() }));
+    await assertFails(setDoc(doc(db, 'invitaciones', 'inv-xxxxxxxxxxxxxxxxxxxxxx'), { empresaId: 'prov3', empresa: 'X X', etiqueta: '', creada: serverTimestamp() }));
+    await assertFails(setDoc(doc(db, 'users', 'm1'), perfil('proveedor')));
+    await assertFails(solicitarComo(db, 'prov1'));
+  });
+  it('hasta cuatro miembros; invitaciones vencidas o de otra empresa no sirven; quien tiene perfil no se suma', async () => {
+    await sembrar('equipos/prov3', { miembros: ['a', 'b', 'c', 'd'] });
+    await invitar();
+    await assertFails(unirse('m1'));
+    await sembrar('equipos/prov3', { miembros: [] });
+    await sembrar('invitaciones/inv-vieja-aaaaaaaaaaaaaaaa', { empresaId: 'prov3', empresa: 'X X', etiqueta: '', creada: new Date(Date.now() - 8 * 86400000) });
+    await assertFails(unirse('m1', 'inv-vieja-aaaaaaaaaaaaaaaa'));
+    await assertFails(unirse('m1', CODIGO, 'prov1'));
+    await assertFails(unirse('prov2'));
+    await assertSucceeds(unirse('m1'));
+  });
+  it('si la empresa baja de plan, el miembro pierde acceso', async () => {
+    await invitar();
+    await unirse('m1');
+    await sembrar('estado/prov3', { plan: 'pro' });
+    await assertFails(getDoc(doc(comoMiembro('m1'), 'users', 'comp1')));
+  });
+  it('el titular quita a un miembro en un lote; el miembro pierde acceso', async () => {
+    await invitar();
+    await unirse('m1');
+    const db = como('prov3');
+    await assertSucceeds(getDocs(query(collection(db, 'miembros'), where('empresaId', '==', 'prov3'))));
+    await assertFails(deleteDoc(doc(db, 'miembros', 'm1')));
+    const lote = writeBatch(db);
+    lote.delete(doc(db, 'miembros', 'm1'));
+    lote.set(doc(db, 'equipos', 'prov3'), { miembros: [], ultimoQuitado: 'm1' });
+    await assertSucceeds(lote.commit());
+    await assertFails(getDoc(doc(comoMiembro('m1'), 'users', 'comp1')));
+    await assertFails(deleteDoc(doc(como('prov1'), 'miembros', 'm1')));
   });
 });
