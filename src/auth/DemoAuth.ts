@@ -166,4 +166,8 @@ export class DemoAuth implements AuthService {
     if (!yo || !otro || !puedeVerContacto(yo.perfil, otro.perfil, acepto)) return null;
     return { ...otro.contacto };
   }
+
+  /** La demo no tiene equipos: los enlaces de invitación funcionan con cuentas reales. */
+  async leerInvitacion() { return null; }
+  async unirseAEquipo(): Promise<Cuenta> { throw new FalloAuth('invitacion-invalida'); }
 }

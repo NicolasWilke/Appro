@@ -749,3 +749,6 @@ textarea { resize: vertical; line-height: 1.5; }
 .admin-cuentas__fila p { margin: 0; }
 .admin-cuentas__datos { display: grid; gap: 0.15rem; min-width: 14rem; flex: 1 1 16rem; }
 .admin-cuentas .acciones-sol { align-items: center; margin: 0; }
+.lista-equipo { list-style: none; padding: 0; margin: 0 0 0.75rem; display: grid; gap: 0.5rem; }
+.lista-equipo li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: center; justify-content: space-between; }
+.lista-equipo__invitacion { padding: 0.5rem 0; border-top: 1px solid var(--linea); }

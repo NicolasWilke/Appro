@@ -1,17 +1,19 @@
 import {
   createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, type User,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { firebase, USA_STORAGE } from '@/firebase/app';
 import { blobADataUrl } from '../imagen';
-import { FalloAuth, type AltaCuenta, type AuthService, type CambiosPerfil, type CodigoFallo, type ContactoCuenta, type Cuenta, type PerfilCuenta } from '../tipos';
+import { fijarEmpresaDeSesion } from '@/data/firestore/sesionEmpresa';
+import { FalloAuth, type AltaCuenta, type AltaMiembro, type AuthService, type InvitacionEquipo, type CambiosPerfil, type CodigoFallo, type ContactoCuenta, type Cuenta, type PerfilCuenta } from '../tipos';
 
 /**
  * Autenticación y perfiles con Firebase.
  *   users/{uid}                    perfil público (PerfilCuenta sin uid)
  *   users/{uid}/privado/contacto   email y teléfono (ContactoCuenta)
  *   logos/{uid}/logo-{fecha}       foto o logo (Storage)
+ *   miembros/{uid}                 usuario del equipo de un proveedor Empresa: actúa por empresaId, sin perfil propio
  * Quién lee qué lo deciden firebase/firestore.rules y firebase/storage.rules.
  */
 
@@ -55,11 +57,12 @@ class FirebaseAuth implements AuthService {
   constructor() {
     onAuthStateChanged(this.auth, async (u) => {
       if (this.registrando) return;
-      this.publicar(u ? await this.leerCuenta(u) : null);
+      this.publicar(u ? await this.leerCuenta(u).catch(() => null) : null);
     });
   }
 
   private publicar(c: Cuenta | null) {
+    fijarEmpresaDeSesion(c?.miembro ? c.uid : null);
     this.ultima = c;
     this.resuelto = true;
     this.oyentes.forEach((fn) => fn(c));
@@ -71,6 +74,8 @@ class FirebaseAuth implements AuthService {
       getDoc(doc(this.db, 'users', u.uid, 'privado', 'contacto')),
     ]);
     if (!perfil.exists()) {
+      const miembro = await getDoc(doc(this.db, 'miembros', u.uid)).catch(() => null);
+      if (miembro?.exists()) return this.leerCuentaDeEquipo(u, miembro.data() as { empresaId: string; nombre: string });
       // Cuenta sin perfil (alta interrumpida): no puede usar la red.
       await signOut(this.auth);
       return null;
@@ -82,6 +87,28 @@ class FirebaseAuth implements AuthService {
       perfil: { ...datos, uid: u.uid, sector: datos.sector ?? '', logoUrl: datos.logoUrl ?? null },
       contacto: (contacto.data() as ContactoCuenta | undefined) ?? { email: u.email ?? '', telefono: '' },
     };
+  }
+
+  /** Miembro de un equipo: la cuenta es la de la empresa. Si la empresa bajó de plan, las reglas no lo dejan leer. */
+  private async leerCuentaDeEquipo(u: User, m: { empresaId: string; nombre: string }, cerrarSiFalla = true): Promise<Cuenta> {
+    try {
+      const [perfil, contacto] = await Promise.all([
+        getDoc(doc(this.db, 'users', m.empresaId)),
+        getDoc(doc(this.db, 'users', m.empresaId, 'privado', 'contacto')),
+      ]);
+      if (!perfil.exists()) throw new FalloAuth('sin-equipo');
+      const datos = perfil.data() as Omit<PerfilCuenta, 'uid'>;
+      return {
+        uid: m.empresaId,
+        email: u.email ?? '',
+        perfil: { ...datos, uid: m.empresaId, sector: datos.sector ?? '', logoUrl: datos.logoUrl ?? null },
+        contacto: (contacto.data() as ContactoCuenta | undefined) ?? { email: '', telefono: '' },
+        miembro: { uid: u.uid, nombre: m.nombre },
+      };
+    } catch {
+      if (cerrarSiFalla) await signOut(this.auth);
+      throw new FalloAuth('sin-equipo');
+    }
   }
 
   private async refrescar() {
@@ -127,7 +154,8 @@ class FirebaseAuth implements AuthService {
     try {
       const cred = await signInWithEmailAndPassword(this.auth, email.trim(), password);
       const cuenta = await this.leerCuenta(cred.user);
-      if (!cuenta) throw new FalloAuth('credenciales');
+      // La contraseña era correcta pero no hay perfil ni equipo (alta interrumpida o lo quitaron del equipo).
+      if (!cuenta) throw new FalloAuth('sin-perfil');
       return cuenta;
     } catch (e) {
       throw traducir(e);
@@ -209,6 +237,60 @@ class FirebaseAuth implements AuthService {
     } catch (e) {
       // Proveedores de ejemplo (sin cuenta en Firebase): las reglas lo rechazan y no hay nada que habilitar.
       if (traducir(e).codigo !== 'sin-permiso') throw traducir(e);
+    }
+  }
+
+  async leerInvitacion(codigo: string): Promise<InvitacionEquipo | null> {
+    try {
+      const d = await getDoc(doc(this.db, 'invitaciones', codigo.trim()));
+      if (!d.exists()) return null;
+      const x = d.data();
+      const vence = new Date((x.creada?.toDate?.() ?? new Date()).getTime() + 7 * 86400000);
+      if (vence <= new Date()) return null;
+      return { codigo: d.id, empresaId: x.empresaId, empresa: x.empresa, vence: vence.toISOString().slice(0, 10) };
+    } catch {
+      return null;
+    }
+  }
+
+  async unirseAEquipo(codigo: string, alta: AltaMiembro) {
+    const inv = await this.leerInvitacion(codigo);
+    if (!inv) throw new FalloAuth('invitacion-invalida');
+    this.registrando = true;
+    let usuario: User | null = null;
+    let unido = false;
+    try {
+      const cred = await createUserWithEmailAndPassword(this.auth, alta.email.trim(), alta.password);
+      usuario = cred.user;
+      // Las reglas exigen las tres cosas juntas: el miembro, su lugar en la lista y la invitación consumida.
+      const lote = writeBatch(this.db);
+      lote.set(doc(this.db, 'miembros', usuario.uid), {
+        empresaId: inv.empresaId, nombre: alta.nombre.trim(), email: usuario.email ?? alta.email.trim(), invitacion: inv.codigo, desde: serverTimestamp(),
+      });
+      lote.set(doc(this.db, 'equipos', inv.empresaId), { miembros: arrayUnion(usuario.uid) }, { merge: true });
+      lote.delete(doc(this.db, 'invitaciones', inv.codigo));
+      try { await lote.commit(); } catch (e) {
+        throw traducir(e).codigo === 'sin-permiso' ? new FalloAuth('invitacion-invalida') : e;
+      }
+      unido = true;
+      await updateProfile(usuario, { displayName: alta.nombre.trim() }).catch(() => undefined);
+      // Recién sumado, la primera lectura puede llegar antes que el cambio de sesión: se reintenta.
+      const datos = { empresaId: inv.empresaId, nombre: alta.nombre.trim() };
+      let cuenta: Cuenta | null = null;
+      for (let intento = 0; intento < 3 && !cuenta; intento++) {
+        if (intento) await new Promise((r) => setTimeout(r, 800 * intento));
+        cuenta = await this.leerCuentaDeEquipo(usuario, datos, false).catch(() => null);
+      }
+      if (!cuenta) throw new FalloAuth('desconocido');
+      this.publicar(cuenta);
+      return cuenta;
+    } catch (e) {
+      // Si ya quedó en el equipo, el usuario no se borra: puede iniciar sesión normalmente.
+      if (usuario && !unido) await usuario.delete().catch(() => signOut(this.auth));
+      if (unido) { this.publicar(await this.leerCuenta(usuario!).catch(() => null)); throw new Error('Ya sos parte del equipo, pero no pudimos abrir tu sesión. Iniciá sesión con tu mail y contraseña.'); }
+      throw traducir(e);
+    } finally {
+      this.registrando = false;
     }
   }
 
