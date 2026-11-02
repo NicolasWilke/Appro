@@ -27,4 +27,9 @@ describe('directorio', () => {
     expect(ordenar(lista, 'relevancia', 'packaging', ahora).map((p) => p.id)).toEqual(['z', 'y', 'x']);
     expect(ordenar(lista, 'calificacion', undefined, ahora).map((p) => p.id)).toEqual(['x', 'z', 'y']);
   });
+  it('relevancia: el plan Empresa va primero; los otros órdenes no miran el plan', () => {
+    const lista = [prov('a', { plan: 'pro', resenas: Array(3).fill(resena(5)) }), prov('b', { plan: 'empresa' }), prov('c', { plan: 'gratis', resenas: Array(3).fill(resena(4)) })];
+    expect(ordenar(lista, 'relevancia', 'packaging', ahora).map((p) => p.id)).toEqual(['b', 'a', 'c']);
+    expect(ordenar(lista, 'calificacion', undefined, ahora).map((p) => p.id)).toEqual(['a', 'c', 'b']);
+  });
 });

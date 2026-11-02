@@ -4,8 +4,10 @@ import { useAuth } from '@/auth/AuthProvider';
 import { prepararLogo } from '@/auth/imagen';
 import { FalloAuth, MENSAJES_FALLO, type CambiosPerfil, type ContactoCuenta } from '@/auth/tipos';
 import { REGION } from '@/config/region';
-import { RUBROS, rubro } from '@/domain/catalogos';
-import type { RubroId } from '@/domain/types';
+import { REGIONES, RUBROS, region, rubro } from '@/domain/catalogos';
+import { PLANES } from '@/domain/planes';
+import type { Proveedor, RegionId, RubroId } from '@/domain/types';
+import { useQuery, useRepo } from '@/data/DataProvider';
 import { esMailValido } from '@/domain/validaciones';
 import { t } from '@/i18n';
 import { Pill, Seccion } from '@/ui/primitivas';
@@ -56,6 +58,7 @@ export function MiPerfil() {
             )}
         </div>
         <div className="mi-perfil__lateral">
+          {p.rol === 'proveedor' && <Regiones />}
           <Seccion titulo="Quién ve tu contacto">
             <p>{p.rol === 'comprador'
               ? 'Tu mail y teléfono los ve solo el proveedor cuya solicitud aceptás. Otros compradores, no.'
@@ -76,6 +79,50 @@ export function MiPerfil() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Regiones en las que el proveedor aparece en la red. La principal sale de su ubicación; sumar es del plan Empresa. */
+function Regiones() {
+  const { cuenta } = useAuth();
+  const repo = useRepo();
+  const avisar = useToast();
+  const { data: yo } = useQuery((r) => r.obtenerPersona(cuenta!.uid) as Promise<Proveedor | null>, [cuenta!.uid]);
+  const [guardando, setGuardando] = useState(false);
+  if (!yo) return null;
+  const cupo = PLANES[yo.plan].regiones;
+  const activas = REGIONES.filter((r) => r.id === yo.region || (yo.cobertura[r.id] ?? 0) > 0).map((r) => r.id);
+  const alternar = async (id: RegionId, si: boolean) => {
+    const extra = (si ? [...activas, id] : activas.filter((x) => x !== id)).filter((x) => x !== yo.region);
+    setGuardando(true);
+    try { await repo.cambiarRegiones(yo.id, extra); avisar(si ? `Ahora también aparecés en ${region(id).nombre}.` : `Ya no aparecés en ${region(id).nombre}.`); }
+    catch (e) { avisar(mensaje(e), 'error'); }
+    finally { setGuardando(false); }
+  };
+  return (
+    <Seccion titulo="Regiones donde trabajás">
+      {cupo > 1 ? (
+        <>
+          <p className="tenue">Los compradores que filtran por estas regiones te encuentran en la red.</p>
+          <ul className="lista-regiones">
+            {REGIONES.map((r) => (
+              <li key={r.id}>
+                <label className="tarjeta__sel">
+                  <input type="checkbox" disabled={guardando || r.id === yo.region} checked={activas.includes(r.id)} onChange={(e) => alternar(r.id, e.target.checked)} />
+                  <span>{r.nombre}{r.id === yo.region && <span className="tenue"> · principal</span>}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <p>Aparecés en <strong>{region(yo.region).nombre}</strong>, la región de tu ubicación.</p>
+          <p className="tenue">Con el plan Empresa sumás las otras regiones y te encuentran compradores de todo el país.</p>
+          <Link className="enlace" to="/planes">Ver planes</Link>
+        </>
+      )}
+    </Seccion>
   );
 }
 

@@ -229,6 +229,8 @@ export interface Plan {
   analitica: boolean;
   destacado: boolean;
   usuarios: number;
+  /** Regiones que puede mostrar en su cobertura, contando la principal */
+  regiones: number;
 }
 
 export interface Uso { solicitudesUsadas: number; respuestasUsadas: number }

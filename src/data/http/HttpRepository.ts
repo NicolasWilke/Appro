@@ -63,6 +63,7 @@ export function crearHttpRepository(baseUrl: string): Repository {
     uso: (id) => pedir(`/proveedores/${id}/uso`),
     cambiarPlan: (id, plan) => pedir(`/proveedores/${id}/plan`, post({ plan })).then(tocar) as never,
     embudo: (id) => pedir(`/proveedores/${id}/embudo`),
+    cambiarRegiones: (id, extra) => pedir(`/proveedores/${id}/regiones`, post({ extra })).then(tocar) as never,
     reiniciarDemo: async () => undefined,
     suscribir: (fn) => { oyentes.add(fn); return () => { oyentes.delete(fn); }; },
   };

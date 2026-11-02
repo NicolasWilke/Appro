@@ -2,7 +2,8 @@ import { REGION } from '@/config/region';
 import { validarRespuestaPedido, validarSolicitud } from '@/domain/reglas';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import { regionDesdeUbicacion, separarNombre } from '@/domain/acceso';
-import type { Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import type { Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, Cotizacion, SolicitudValor, DatosCuenta, FiltroRed, FrecuenciaAvisos, MailSaliente, PedidoCotizacion, Persona, Proveedor, RegionId, SolicitudContacto, Uso, ValorReferencia } from '@/domain/types';
+import { PLANES } from '@/domain/planes';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { antecedentesDe, antiguedad, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
 import { adjudicadosDe, validarAdjudicacion, validarCotizacion, validarPedido, validarPregunta, validarRespuestaConsulta } from '@/domain/rfq';
@@ -95,7 +96,8 @@ const ventanaAbierta = (c: Comprador) => !!c.ventanaHasta && c.ventanaHasta >= h
 function coincide(p: Persona, f?: FiltroRed) {
   if (!f) return true;
   if (f.rubro && !p.rubros.includes(f.rubro)) return false;
-  if (f.region && p.region !== f.region) return false;
+  // Un proveedor aparece en la región principal y en las que cubre (más de una con el plan Empresa).
+  if (f.region && p.region !== f.region && !(p.rol === 'proveedor' && (p.cobertura[f.region] ?? 0) > 0)) return false;
   if (f.soloVentanaAbierta && p.rol === 'comprador' && !ventanaAbierta(p)) return false;
   if (f.texto) {
     const t = f.texto.toLowerCase();
@@ -376,6 +378,14 @@ export class MockRepository implements Repository {
     this.proveedor(proveedorId).plan = plan;
     this.guardar();
     return 'activo' as const;
+  }
+  async cambiarRegiones(proveedorId: string, extra: RegionId[]) {
+    const p = this.proveedor(proveedorId);
+    const lista = [p.region, ...extra.filter((r) => r !== p.region)];
+    if (lista.length > PLANES[p.plan].regiones) throw new Error('Tu plan muestra una sola región. Con el plan Empresa sumás varias.');
+    // La demo conserva el porcentaje que ya tenía cada región.
+    p.cobertura = Object.fromEntries(lista.map((r) => [r, p.cobertura[r] ?? 100]));
+    this.guardar();
   }
 
   async embudo(proveedorId: string) {

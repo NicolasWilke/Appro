@@ -1,6 +1,6 @@
 import type {
   Antecedente, Comprador, EscalaConvenio, Indicador, Consulta, DatosCuenta, SolicitudValor, FrecuenciaAvisos, MailSaliente, ValorReferencia, Cotizacion, Embudo, EstadoSolicitud, FiltroRed, PedidoCotizacion,
-  Persona, PlanId, Proveedor, Resena, SerieIndice, SolicitudContacto, Uso,
+  Persona, PlanId, Proveedor, RegionId, Resena, SerieIndice, SolicitudContacto, Uso,
 } from '@/domain/types';
 import type { DatosResena } from '@/domain/resenas';
 
@@ -91,6 +91,8 @@ export interface Repository {
   /** 'activo': se aplicó ya (demo). 'solicitado': lo activa el equipo al confirmar el cobro. */
   cambiarPlan(proveedorId: string, plan: PlanId): Promise<'activo' | 'solicitado'>;
   embudo(proveedorId: string): Promise<Embudo>;
+  /** Regiones que el proveedor suma a la principal. Más de una solo con el plan Empresa. */
+  cambiarRegiones(proveedorId: string, extra: RegionId[]): Promise<void>;
 
   reiniciarDemo(): Promise<void>;
   /** Notifica cambios para que las vistas se refresquen. En producción: websocket o revalidación. */

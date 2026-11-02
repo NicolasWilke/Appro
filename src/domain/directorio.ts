@@ -1,3 +1,4 @@
+import { PLANES } from './planes';
 import type { Persona, Proveedor, RubroId } from './types';
 
 /**
@@ -44,11 +45,17 @@ export function insignias(p: Proveedor, ahora = new Date()): Insignia[] {
 
 export type Orden = 'relevancia' | 'calificacion' | 'resenas' | 'antiguedad';
 
-/** Relevancia: primero quien tiene el rubro buscado, después la calificación ponderada, después la antigüedad. */
+/** El plan Empresa compra visibilidad: en la relevancia va primero, siempre rotulado como publicidad. */
+export const esDestacado = (p: Proveedor) => PLANES[p.plan]?.destacado === true;
+
+/**
+ * Relevancia: primero los destacados (plan Empresa), después quien tiene el rubro buscado, después la calificación
+ * ponderada, después la antigüedad. Los otros órdenes los elige el comprador y no miran el plan.
+ */
 export function ordenar(lista: Proveedor[], orden: Orden, rubro?: RubroId, ahora = new Date()): Proveedor[] {
   const nota = (p: Proveedor) => reputacionVisible(p) ? promedioPonderado(p, ahora) : 0;
   const cmp: Record<Orden, (a: Proveedor, b: Proveedor) => number> = {
-    relevancia: (a, b) => Number(!!rubro && b.rubros[0] === rubro) - Number(!!rubro && a.rubros[0] === rubro) || nota(b) - nota(a) || a.desde - b.desde,
+    relevancia: (a, b) => Number(esDestacado(b)) - Number(esDestacado(a)) || Number(!!rubro && b.rubros[0] === rubro) - Number(!!rubro && a.rubros[0] === rubro) || nota(b) - nota(a) || a.desde - b.desde,
     calificacion: (a, b) => nota(b) - nota(a) || b.resenas.length - a.resenas.length,
     resenas: (a, b) => b.resenas.length - a.resenas.length,
     antiguedad: (a, b) => a.desde - b.desde,
