@@ -42,6 +42,13 @@ function esIOS(): boolean {
 /** Se llama una vez al arrancar, antes de React, para no perder el evento del navegador. */
 export function prepararInstalacion() {
   if (import.meta.env.VITE_ROUTER === 'memory' || !('serviceWorker' in navigator)) return;
+  // La demo (sitio sin Firebase) no se ofrece como app: instalada, quedaría atada a datos de prueba
+  // y parecería que la app "entra en demo". Se quita el manifiesto y cualquier service worker viejo.
+  if (import.meta.env.VITE_AUTH !== 'firebase') {
+    document.querySelector('link[rel="manifest"]')?.remove();
+    navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => { void r.unregister(); })).catch(() => {});
+    return;
+  }
   if (import.meta.env.PROD) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => { /* sin SW la app anda igual */ }); });
   }
