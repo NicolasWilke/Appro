@@ -18,11 +18,21 @@ export function Cuentas() {
   const { cuenta } = useAuth();
   const [texto, setTexto] = useState('');
   const [rol, setRol] = useState<'proveedor' | 'comprador' | ''>('proveedor');
-  const { data, cargando } = useQuery(async (r) => {
+  const { data, cargando, error } = useQuery(async (r) => {
     const admin = await r.esAdmin(cuenta!.uid);
     return { admin, cuentas: admin ? await r.cuentasAdmin() : [] };
   }, [cuenta?.uid]);
 
+  if (error) {
+    return (
+      <div className="envoltura pagina">
+        <Vacio titulo="No se pudieron leer las cuentas" accion={{ a: '/panel', texto: 'Volver al panel' }}>
+          Tu usuario figura en admins, pero Firestore rechazó la lectura. Lo más común: esta cuenta no tiene perfil en la red
+          (users/{cuenta?.uid}) o las reglas publicadas son viejas. Detalle: {error.message}
+        </Vacio>
+      </div>
+    );
+  }
   if (cargando || !data) return <div className="envoltura pagina" />;
   if (!data.admin) {
     return (
