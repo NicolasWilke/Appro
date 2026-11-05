@@ -11,8 +11,8 @@ export default async () => {
   // Se limpia lo que suele colarse al pegar: espacios, saltos de línea, comillas o un "Bearer " delante.
   const token = (process.env.AVISOS_GITHUB_TOKEN ?? '')
     .trim()
-    .replace(/^bearer\s+/i, '')
     .replace(/^["']|["']$/g, '')
+    .replace(/^bearer\s+/i, '')
     .trim();
   if (!token) return new Response('Sin AVISOS_GITHUB_TOKEN: no se dispara nada.');
 
