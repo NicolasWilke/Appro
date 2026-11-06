@@ -20,6 +20,9 @@ rules_version = '2';
 // miembros/{uid}                       usuario del equipo comercial de un proveedor Empresa (actúa por empresaId)
 // equipos/{empresa}                    lista de miembros de la empresa: hasta 4, más el titular
 // invitaciones/{codigo}                enlace de un solo uso, 7 días, para sumarse al equipo
+// users/{uid}/metricas/vistas          cuántas veces lo vieron compradores (embudo del proveedor), sin decir quién
+// bajas/{uid}                          el usuario pide borrar su cuenta; el script de avisos la borra en la próxima corrida
+// listaEspera/{uid}                    un comprador se anota para el plan Equipo
 //
 // Equipo (plan Empresa): un miembro no tiene perfil propio. Mientras la empresa tenga el plan Empresa, las reglas
 // lo tratan como a la empresa (miEmpresa / actuaPor) para pedidos, ofertas, solicitudes y consultas. No edita el
@@ -164,6 +167,17 @@ service cloud.firestore {
           && request.resource.data.desde == request.time;
         allow update: if false;
       }
+
+      // Vistas del perfil de un proveedor: solo un comprador suma, de a uno, y solo el proveedor lee el total.
+      // Es un contador y no una lista: el proveedor no sabe quién lo miró.
+      match /metricas/{doc} {
+        allow read: if doc == 'vistas' && actuaPor(uid);
+        allow create: if doc == 'vistas' && tienePerfil() && miRol() == 'comprador' && rolDe(uid) == 'proveedor'
+          && request.resource.data.keys().hasOnly(['total']) && request.resource.data.total == 1;
+        allow update: if doc == 'vistas' && tienePerfil() && miRol() == 'comprador' && rolDe(uid) == 'proveedor'
+          && request.resource.data.keys().hasOnly(['total']) && request.resource.data.total == resource.data.total + 1;
+        allow delete: if false;
+      }
     }
 
     // Plan y verificaciones: los define el equipo (un admin desde /admin/cuentas), nunca el usuario.
@@ -202,6 +216,12 @@ service cloud.firestore {
         && soloCambia(['estado'])
         && resource.data.estado in ['pendiente', 'postergada']
         && request.resource.data.estado in ['aceptada', 'postergada', 'rechazada'];
+      // Con la solicitud aceptada, el proveedor anota si hubo reunión (embudo). No toca nada más.
+      allow update: if autenticado()
+        && actuaPor(resource.data.proveedorId)
+        && resource.data.estado == 'aceptada'
+        && soloCambia(['reunion'])
+        && request.resource.data.reunion is bool;
       allow delete: if false;
     }
 
@@ -581,6 +601,28 @@ service cloud.firestore {
     }
     match /indicePrecios/{id} { allow read: if tienePerfil(); allow write: if false; }
     match /config/{doc} { allow read: if tienePerfil(); allow write: if false; }
+
+    // ── Baja de la cuenta (Ley 25.326, supresión): el usuario la pide y el script de avisos borra todo
+    // en la próxima corrida (cada 30 minutos). Un miembro de equipo también la pide, por su usuario.
+    match /bajas/{uid} {
+      allow read: if esDuenio(uid) || esAdmin();
+      allow create: if esDuenio(uid)
+        && request.resource.data.keys().hasOnly(['pedida'])
+        && request.resource.data.pedida == request.time;
+      allow update, delete: if false;
+    }
+
+    // ── Lista de espera del plan Equipo: el comprador se anota, el equipo la ve en /admin.
+    match /listaEspera/{uid} {
+      allow read: if esDuenio(uid) || esAdmin();
+      allow create: if esDuenio(uid) && tienePerfil() && miRol() == 'comprador'
+        && request.resource.data.keys().hasOnly(['plan', 'empresa', 'anotado'])
+        && request.resource.data.plan == 'equipo'
+        && request.resource.data.empresa == perfil(uid).data.empresa
+        && request.resource.data.anotado == request.time;
+      allow update: if false;
+      allow delete: if esDuenio(uid) || esAdmin();
+    }
 
     // ── Reseñas: una por pedido y proveedor ganador, del comprador que lo publicó. No se editan.
     // El id es el del pedido para el proveedor principal (adjudicadaA) y "{pedido}--{proveedor}" para los demás.

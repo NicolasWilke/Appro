@@ -5,7 +5,7 @@ import { useQuery } from '@/data/DataProvider';
 import type { Comprador, PedidoCotizacion, Proveedor, SolicitudContacto } from '@/domain/types';
 import { recibeOfertas } from '@/domain/rfq';
 import { fmt, t } from '@/i18n';
-import { Avatar, Chip, Pill, Seccion, Vacio } from '@/ui/primitivas';
+import { Avatar, Pill, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
 import { ContactoPersona } from '../red/ContactoPersona';
 import { TarjetaProveedor } from '../red/TarjetaProveedor';
@@ -83,12 +83,6 @@ export function PanelComprador() {
           <Seccion titulo="Proveedores sugeridos para tus rubros">
             <div className="pila">{sugeridos.map((p) => <TarjetaProveedor key={p.id} p={p} />)}</div>
           </Seccion>
-          {yo.circulos.length > 0 && (
-            <Seccion titulo="Tus círculos">
-              <div className="chips">{yo.circulos.map((c) => <Chip key={c}>{c}</Chip>)}</div>
-              <p className="tenue">Esta semana: guía de retenciones y percepciones de IIBB para compras interprovinciales.</p>
-            </Seccion>
-          )}
         </div>
       </div>
     </div>

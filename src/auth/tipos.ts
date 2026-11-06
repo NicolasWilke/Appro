@@ -63,6 +63,12 @@ export interface AuthService {
   registrar(alta: AltaCuenta): Promise<Cuenta>;
   ingresar(email: string, password: string): Promise<Cuenta>;
   salir(): Promise<void>;
+  /**
+   * Pide borrar la cuenta (Ley 25.326, supresión) y cierra la sesión. Con Firebase queda el pedido en bajas/{uid}
+   * y el script de avisos borra perfil, pedidos, ofertas, solicitudes y el usuario en la próxima corrida.
+   * Un miembro de equipo borra solo su usuario; la empresa sigue.
+   */
+  pedirBaja(): Promise<void>;
   /** Manda el mail para crear una contraseña nueva. No revela si el mail existe. */
   restablecerPassword(email: string): Promise<void>;
   actualizarPerfil(cambios: CambiosPerfil, contacto?: Partial<ContactoCuenta>): Promise<void>;

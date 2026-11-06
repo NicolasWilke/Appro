@@ -166,6 +166,16 @@ class FirebaseAuth implements AuthService {
     await signOut(this.auth);
   }
 
+  async pedirBaja() {
+    const u = this.yo();
+    try {
+      await setDoc(doc(this.db, 'bajas', u.uid), { pedida: serverTimestamp() });
+    } catch (e) {
+      throw traducir(e);
+    }
+    await signOut(this.auth);
+  }
+
   async restablecerPassword(email: string) {
     try {
       await sendPasswordResetEmail(this.auth, email.trim(), { url: `${window.location.origin}/ingresar` });

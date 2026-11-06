@@ -31,6 +31,9 @@ interface Estado {
   favoritos?: Record<string, string[]>;
   antecedentes?: Antecedente[];
   solicitudesValor?: SolicitudValor[];
+  /** Vistas de compradores por proveedor */
+  vistas?: Record<string, number>;
+  listaEspera?: { uid: string; empresa: string; anotado: string }[];
 }
 
 const haceDias = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
@@ -417,11 +420,30 @@ export class MockRepository implements Repository {
 
   async embudo(proveedorId: string) {
     const enviadas = this.estado.solicitudes.filter((s) => s.proveedorId === proveedorId);
-    const aceptadas = enviadas.filter((s) => s.estado === 'aceptada').length;
+    const aceptadas = enviadas.filter((s) => s.estado === 'aceptada');
     const ganadas = this.estado.pedidos.filter((p) => p.adjudicados?.includes(proveedorId)).length;
+    const vistas = this.estado.vistas?.[proveedorId] ?? 0;
     // Base histórica ficticia para que el tablero de la demo tenga volumen.
-    return { vistas: 342, solicitudes: 14 + enviadas.length, aceptadas: 8 + aceptadas, reuniones: 5 + aceptadas, ganadas: 2 + ganadas };
+    return { vistas: 342 + vistas, solicitudes: 14 + enviadas.length, aceptadas: 8 + aceptadas.length, reuniones: 5 + aceptadas.filter((s) => s.reunion).length, ganadas: 2 + ganadas };
   }
+  async registrarVista(proveedorId: string) {
+    const v = (this.estado.vistas ??= {});
+    v[proveedorId] = (v[proveedorId] ?? 0) + 1;
+    try { localStorage.setItem(CLAVE, JSON.stringify(this.estado)); } catch { /* sin persistencia */ }
+  }
+  async marcarReunion(solicitudId: string, hubo: boolean) {
+    const s = this.estado.solicitudes.find((x) => x.id === solicitudId);
+    if (!s || s.estado !== 'aceptada') throw new Error('Solo se anota una reunión con una solicitud aceptada.');
+    s.reunion = hubo;
+    this.guardar();
+  }
+  async enListaEspera(compradorId: string) { return !!this.estado.listaEspera?.some((x) => x.uid === compradorId); }
+  async sumarseListaEspera(compradorId: string, empresa: string) {
+    const l = (this.estado.listaEspera ??= []);
+    if (!l.some((x) => x.uid === compradorId)) l.unshift({ uid: compradorId, empresa, anotado: hoy() });
+    this.guardar();
+  }
+  async listaEspera() { return [...(this.estado.listaEspera ?? [])]; }
 
   async reiniciarDemo() {
     this.estado = inicial();

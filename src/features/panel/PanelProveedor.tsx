@@ -47,12 +47,14 @@ export function PanelProveedor() {
   const contactados = new Set(enviadas.filter((s) => s.estado !== 'rechazada').map((s) => s.compradorId));
   const oportunidades = compradores.filter((c) => ventanaAbierta(c) && !contactados.has(c.id) && c.rubros.some((r) => yo.rubros.includes(r)));
   const etapas = [
-    { k: 'Vistas de perfil', v: embudo.vistas },
+    { k: 'Vistas de compradores', v: embudo.vistas },
     { k: 'Solicitudes enviadas', v: embudo.solicitudes },
     { k: 'Aceptadas', v: embudo.aceptadas },
     { k: 'Reuniones', v: embudo.reuniones },
     { k: 'Cotizaciones ganadas', v: embudo.ganadas },
   ];
+  // Las barras se miden contra la etapa más grande: un comprador puede aceptar sin haber abierto el perfil.
+  const maximo = Math.max(1, ...etapas.map((e) => e.v));
   const tasa = embudo.solicitudes ? Math.round((embudo.aceptadas / embudo.solicitudes) * 100) : 0;
 
   return (
@@ -149,6 +151,15 @@ export function PanelProveedor() {
                       <ContactoPersona p={c} aceptado />
                     </div>
                   )}
+                  {s.estado === 'aceptada' && (
+                    <label className="opcion opcion--inline">
+                      <input type="checkbox" checked={!!s.reunion} onChange={async (e) => {
+                        try { await repo.marcarReunion(s.id, e.target.checked); avisar(e.target.checked ? 'Anotamos la reunión en tu embudo.' : 'Sacamos la reunión de tu embudo.', 'info'); }
+                        catch { avisar('No se pudo guardar. Probá de nuevo.', 'error'); }
+                      }} />
+                      <span>Tuvimos una reunión</span>
+                    </label>
+                  )}
                   {est === 'cerrada' && <p className="tenue">Se cerró sin respuesta. Podés volver a intentar con otra propuesta.</p>}
                 </article>
               );
@@ -156,12 +167,12 @@ export function PanelProveedor() {
           </Seccion>
         </div>
       </div>
-      <Seccion titulo="Tu embudo · últimos 90 días" extra={plan.analitica ? <Pill tono={tasa >= 60 ? 'ok' : 'senal'}>{tasa}% de aceptación</Pill> : undefined}>
+      <Seccion titulo="Tu embudo" extra={plan.analitica ? <Pill tono={tasa >= 60 ? 'ok' : 'senal'}>{tasa}% de aceptación</Pill> : undefined}>
         <div className={`embudo ${plan.analitica ? '' : 'is-bloqueado'}`}>
           {etapas.map((e) => (
             <div key={e.k} className="embudo__etapa">
               <span className="embudo__v mono">{fmt.numero(e.v)}</span>
-              <span className="embudo__barra"><span style={{ width: `${Math.max(4, (e.v / etapas[0].v) * 100)}%` }} /></span>
+              <span className="embudo__barra"><span style={{ width: `${Math.max(4, (e.v / maximo) * 100)}%` }} /></span>
               <span className="embudo__k">{e.k}</span>
             </div>
           ))}

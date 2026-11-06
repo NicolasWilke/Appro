@@ -21,6 +21,18 @@ export function Planes() {
   const repo = useRepo();
   const avisar = useToast();
   const [anual, setAnual] = useState(false);
+  const esComprador = cuenta?.perfil.rol === 'comprador';
+  const { data: enEspera } = useQuery((r) => (esComprador ? r.enListaEspera(cuenta.uid) : Promise.resolve(false)), [esComprador, cuenta?.uid]);
+  const anotarse = async () => {
+    if (!cuenta) { ir('/ingresar?modo=registro&rol=comprador'); return; }
+    if (!esComprador) { avisar('El plan Equipo es para compradores.', 'info'); return; }
+    try {
+      await repo.sumarseListaEspera(cuenta.uid, cuenta.perfil.empresa);
+      avisar('Te anotamos en la lista de espera del plan Equipo.', 'info');
+    } catch {
+      avisar('No pudimos anotarte. Probá de nuevo en un momento.', 'error');
+    }
+  };
   const { data: yo } = useQuery((r) => (esProveedor ? r.obtenerPersona(cuenta.uid) : Promise.resolve(null)) as Promise<Proveedor | null>, [esProveedor, cuenta?.uid]);
 
   const elegir = async (id: PlanId) => {
@@ -69,13 +81,15 @@ export function Planes() {
         <article className="plan">
           <header><h3>Comprador</h3></header>
           <p className="plan__precio"><span className="mono">Gratis</span><span className="tenue"> para siempre</span></p>
-          <ul className="lista-check"><li>Perfil verificado</li><li>Pedidos de cotización ilimitados</li><li>Comparador e índice de precios</li><li>Reseñas y círculos de compradores</li></ul>
+          <ul className="lista-check"><li>Perfil verificado</li><li>Pedidos de cotización ilimitados</li><li>Comparador e índice de precios</li><li>Reseñas de proveedores</li></ul>
         </article>
         <article className="plan plan--proximo">
           <header><h3>Equipo de compras</h3><Pill tono="senal">Próximamente</Pill></header>
           <p className="plan__precio"><span className="tenue">Para empresas medianas y grandes</span></p>
           <ul className="lista-check"><li>Varios compradores en una cuenta</li><li>Flujo de aprobación</li><li>Historial de proveedores</li><li>Exportación al ERP</li></ul>
-          <button className="btn btn--sec" onClick={() => avisar('Te sumamos a la lista de espera del plan Equipo.', 'info')}>Sumarme a la lista de espera</button>
+          {enEspera
+            ? <p className="tenue">Ya estás en la lista de espera. Te escribimos cuando esté listo.</p>
+            : <button className="btn btn--sec" onClick={anotarse}>Sumarme a la lista de espera</button>}
         </article>
       </div>
     </div>
