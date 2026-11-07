@@ -75,7 +75,7 @@ export function Privacidad() {
       </ul>
 
       <h2>5. Tus derechos</h2>
-      <p>Conforme a la {REGION.leyDatos}, tenés derecho a acceder, rectificar, actualizar o pedir la supresión de tus datos. Podés hacerlo desde Mi perfil en {N}: editás tus datos, descargás una copia con «Descargar mis datos» o borrás todo con «Eliminar mi cuenta». La Agencia de Acceso a la Información Pública ({REGION.autoridadDatos}) es el órgano de control y podés presentar un reclamo ante ella si lo considerás necesario.</p>
+      <p>Conforme a la {REGION.leyDatos}, tenés derecho a acceder, rectificar, actualizar o pedir la supresión de tus datos. Podés hacerlo desde Mi perfil en {N}: editás tus datos, descargás una copia con «Ver o guardar en PDF» (o en formato técnico, .json) o borrás todo con «Eliminar mi cuenta». La Agencia de Acceso a la Información Pública ({REGION.autoridadDatos}) es el órgano de control y podés presentar un reclamo ante ella si lo considerás necesario.</p>
 
       <h2>6. Seguridad</h2>
       <p>Tomamos medidas razonables para proteger tus datos: reglas de acceso en la base que limitan qué puede leer cada cuenta, contraseñas que nunca vemos y conexiones cifradas. Ninguna plataforma puede garantizar una seguridad absoluta, y seguimos reforzando estas protecciones a medida que {N} crece.</p>
