@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { FalloAuth, MENSAJES_FALLO } from '@/auth/tipos';
+import { MARCA } from '@/config/marca';
 import { REGION } from '@/config/region';
 import { useRepo } from '@/data/DataProvider';
+import { informeHtml } from '@/domain/informeDatos';
 import { descargar } from '@/ui/descargar';
 import { Modal } from '@/ui/Modal';
 import { Seccion } from '@/ui/primitivas';
@@ -25,29 +27,61 @@ export function MisDatos() {
   const c = cuenta!;
   const miembro = c.miembro;
 
-  async function bajarDatos() {
+  async function juntarDatos() {
+    const uid = c.uid;
+    const esComprador = c.perfil.rol === 'comprador';
+    const [persona, solicitudes, pedidos, favoritos, valores] = await Promise.all([
+      repo.obtenerPersona(uid),
+      esComprador ? repo.solicitudesRecibidas(uid) : repo.solicitudesEnviadas(uid),
+      esComprador ? repo.listarPedidos({ compradorId: uid, visorId: uid }) : Promise.resolve([]),
+      esComprador ? repo.favoritos(uid) : Promise.resolve([]),
+      repo.solicitudesValor(esComprador ? { compradorId: uid } : { proveedorId: uid }),
+    ]);
+    return {
+      exportado: new Date().toISOString(),
+      usuario: { email: c.email, ...(miembro ? { miembroDeEquipo: miembro.nombre } : {}) },
+      perfil: c.perfil,
+      contacto: c.contacto,
+      enLaRed: persona,
+      solicitudesDeContacto: solicitudes,
+      ...(esComprador ? { pedidosDeCotizacion: pedidos, proveedoresFavoritos: favoritos } : {}),
+      pedidosDeValor: valores,
+    };
+  }
+
+  const hoy = () => new Date().toISOString().slice(0, 10);
+
+  /** Versión para leer: se abre en otra pestaña con el diálogo de imprimir, donde se elige "Guardar como PDF". */
+  async function bajarLegible() {
+    // La pestaña se abre en el clic, antes de esperar los datos: si no, el navegador la bloquea.
+    const ventana = window.open('', '_blank');
+    ventana?.document.write('<p style="font-family:system-ui;padding:24px">Preparando tus datos…</p>');
     setOcupado(true);
     try {
-      const uid = c.uid;
-      const esComprador = c.perfil.rol === 'comprador';
-      const [persona, solicitudes, pedidos, favoritos, valores] = await Promise.all([
-        repo.obtenerPersona(uid),
-        esComprador ? repo.solicitudesRecibidas(uid) : repo.solicitudesEnviadas(uid),
-        esComprador ? repo.listarPedidos({ compradorId: uid, visorId: uid }) : Promise.resolve([]),
-        esComprador ? repo.favoritos(uid) : Promise.resolve([]),
-        repo.solicitudesValor(esComprador ? { compradorId: uid } : { proveedorId: uid }),
-      ]);
-      const datos = {
-        exportado: new Date().toISOString(),
-        usuario: { email: c.email, ...(miembro ? { miembroDeEquipo: miembro.nombre } : {}) },
-        perfil: c.perfil,
-        contacto: c.contacto,
-        enLaRed: persona,
-        solicitudesDeContacto: solicitudes,
-        ...(esComprador ? { pedidosDeCotizacion: pedidos, proveedoresFavoritos: favoritos } : {}),
-        pedidosDeValor: valores,
-      };
-      descargar(`mis-datos-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(datos, null, 2), 'application/json;charset=utf-8');
+      const html = informeHtml(await juntarDatos(), { marca: MARCA.nombre, ley: REGION.leyDatos });
+      if (ventana && !ventana.closed) {
+        ventana.document.open();
+        ventana.document.write(html);
+        ventana.document.close();
+        ventana.focus();
+        setTimeout(() => ventana.print(), 300);
+      } else {
+        // Ventanas emergentes bloqueadas: queda el archivo para abrir con doble clic.
+        descargar(`mis-datos-${hoy()}.html`, html, 'text/html;charset=utf-8');
+      }
+    } catch (e) {
+      ventana?.close();
+      avisar(mensaje(e), 'error');
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /** Versión técnica, para llevar los datos a otro sistema. */
+  async function bajarJson() {
+    setOcupado(true);
+    try {
+      descargar(`mis-datos-${hoy()}.json`, JSON.stringify(await juntarDatos(), null, 2), 'application/json;charset=utf-8');
     } catch (e) {
       avisar(mensaje(e), 'error');
     } finally {
@@ -71,7 +105,8 @@ export function MisDatos() {
     <Seccion titulo="Tus datos">
       <p className="tenue">Por la {REGION.leyDatos} podés llevarte una copia de tus datos o borrar tu cuenta cuando quieras.</p>
       <div className="acciones-sol">
-        <button className="btn btn--sec" disabled={ocupado} onClick={bajarDatos}>Descargar mis datos</button>
+        <button className="btn btn--sec" disabled={ocupado} onClick={bajarLegible}>Ver o guardar en PDF</button>
+        <button className="btn btn--ter" disabled={ocupado} onClick={bajarJson}>Descargar para otro sistema (.json)</button>
         <button className="btn btn--ter" disabled={ocupado} onClick={() => setBajando(true)}>{miembro ? 'Borrar mi usuario' : 'Eliminar mi cuenta'}</button>
       </div>
       {bajando && (
