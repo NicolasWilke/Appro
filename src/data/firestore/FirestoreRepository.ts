@@ -9,6 +9,7 @@ import type {
 } from '@/domain/types';
 import { validarResena, validarValor, type DatosResena } from '@/domain/resenas';
 import { textoBuscable } from '@/domain/directorio';
+import { combinarValores } from '@/domain/valores';
 import { DIAS_INVITACION, lugaresEquipo, mesCupo, PLANES } from '@/domain/planes';
 import { empresaDeSesion } from './sesionEmpresa';
 import { antecedentesDe, desdeVentana, validarRespuestaValor, validarSolicitudValor } from '@/domain/antecedentes';
@@ -310,9 +311,8 @@ export class FirestoreRepository implements Repository {
   // ── Referencias
   async valoresReferencia() {
     const [snap, indice] = await Promise.all([getDocs(collection(this.db, 'valoresReferencia')), getDoc(doc(this.db, 'config', 'indice'))]);
-    // Lo cargado en Firestore pisa al valor del código con el mismo id; lo nuevo se suma.
-    const guardados = new Map(snap.docs.map((d) => [d.id, { ...(d.data() as ValorReferencia), id: d.id }]));
-    const valores = [...valoresBase.map((v) => guardados.get(v.id) ?? v), ...[...guardados.values()].filter((v) => !valoresBase.some((b) => b.id === v.id))];
+    // Lo cargado en Firestore pisa al valor del código con el mismo id, salvo que el código sea más nuevo; lo nuevo se suma.
+    const valores = combinarValores(valoresBase, snap.docs.map((d) => ({ ...(d.data() as ValorReferencia), id: d.id })));
     const i = indice.data() ?? {};
     return { valores, mesesIso: (i.mesesIso ?? []) as string[], inflacion: (i.inflacion ?? []) as number[] };
   }

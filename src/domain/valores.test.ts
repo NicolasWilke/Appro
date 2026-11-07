@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { inflacion, mesesIso, valores } from '@/data/mock/seed';
 import type { ValorReferencia } from './types';
-import { ajustar, estimarTotal, factorInflacion, posicionEnRango, tieneValor, valorDelRubro, valoresPara } from './valores';
+import { ajustar, combinarValores, estimarTotal, factorInflacion, posicionEnRango, tieneValor, valorDelRubro, valoresPara } from './valores';
 
 const base: ValorReferencia = { id: 'x', rubro: 'mantenimiento', concepto: 'x', tipo: 'hora', unidad: 'hora', region: 'cba', principal: true, min: 100, mediana: 120, max: 150 };
 
@@ -40,5 +40,17 @@ describe('valores de referencia', () => {
       expect(ids.has(v.id)).toBe(false);
       ids.add(v.id);
     }
+  });
+  it('al combinar con la base gana lo guardado, salvo que el código sea más nuevo o lo guardado esté en 0', () => {
+    const codigo = { ...base, fecha: '2026-11', mediana: 200, max: 250 };
+    const editadoViejo = { ...base, fecha: '2026-10' };
+    const editadoNuevo = { ...base, fecha: '2026-12', mediana: 300 };
+    const vacio = { ...base, min: 0, mediana: 0, max: 0 };
+    const extra = { ...base, id: 'otro' };
+    expect(combinarValores([codigo], [editadoViejo])[0].mediana).toBe(200);
+    expect(combinarValores([codigo], [editadoNuevo])[0].mediana).toBe(300);
+    expect(combinarValores([codigo], [vacio])[0].mediana).toBe(200);
+    expect(combinarValores([vacio], [editadoViejo])[0].mediana).toBe(120);
+    expect(combinarValores([codigo], [extra]).map((v) => v.id)).toEqual(['x', 'otro']);
   });
 });

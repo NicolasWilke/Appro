@@ -19,6 +19,20 @@ export function ajustar(v: ValorReferencia, factor: number): ValorReferencia {
   return { ...v, min: v.min * factor, mediana: v.mediana * factor, max: v.max * factor };
 }
 
+/**
+ * Junta los valores del código con los guardados en la base (mismo id = mismo concepto).
+ * Gana lo guardado, salvo que el código traiga un valor cargado y más nuevo (fecha posterior, o lo guardado en 0):
+ * así una actualización publicada en el código llega a producción sin tener que volver a sembrar la base.
+ */
+export function combinarValores(base: ValorReferencia[], guardados: ValorReferencia[]): ValorReferencia[] {
+  const porId = new Map(guardados.map((g) => [g.id, g]));
+  const masNuevo = (b: ValorReferencia, g: ValorReferencia) => tieneValor(b) && (!tieneValor(g) || (!!b.fecha && b.fecha > (g.fecha ?? '')));
+  return [
+    ...base.map((b) => { const g = porId.get(b.id); return g && !masNuevo(b, g) ? g : b; }),
+    ...guardados.filter((g) => !base.some((b) => b.id === g.id)),
+  ];
+}
+
 /** Valores que aplican a una región: los propios de la región más los nacionales. */
 export function valoresPara(valores: ValorReferencia[], f: { rubro?: RubroId; region?: RegionId; tipo?: ValorReferencia['tipo'] }) {
   return valores.filter((v) =>

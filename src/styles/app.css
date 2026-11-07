@@ -426,6 +426,10 @@ textarea { resize: vertical; line-height: 1.5; }
 .valores { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr); gap: 1.25rem; align-items: start; }
 @media (max-width: 960px) { .valores { grid-template-columns: minmax(0, 1fr); } }
 .valores__lista { display: grid; gap: 0.75rem; min-width: 0; }
+.valores__lista { gap: 1.75rem; }
+.valores__sector { display: grid; gap: 0.75rem; min-width: 0; }
+.valores__sector-tit { font-size: var(--t-l); margin: 0; padding-bottom: 0.4rem; border-bottom: 1px solid var(--linea); }
+.valores__sector-tit .tenue { font-size: var(--t-s); font-weight: 400; }
 .valor { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-m); padding: 1rem 1.15rem; display: grid; gap: 0.8rem; }
 .valor.is-sel { border-color: var(--sello); box-shadow: 0 0 0 1px var(--sello); }
 .valor__cab { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }

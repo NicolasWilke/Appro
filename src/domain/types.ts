@@ -1,5 +1,5 @@
 export type Rol = 'comprador' | 'proveedor';
-export type RubroId = 'packaging' | 'frio' | 'mantenimiento' | 'etiquetas' | 'quimicos' | 'cargas' | 'seguridad';
+export type RubroId = 'packaging' | 'frio' | 'mantenimiento' | 'etiquetas' | 'quimicos' | 'cargas' | 'seguridad' | 'limpieza';
 export type RegionId = 'ros' | 'amba' | 'cba' | 'noa' | 'costa';
 export type PlanId = 'gratis' | 'pro' | 'empresa';
 export type FrecuenciaAvisos = 'inmediato' | 'diario' | 'pausado';
