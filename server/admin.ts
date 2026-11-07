@@ -3,9 +3,11 @@
 //   npm run admin -- verificar <email>                    marca CUIT, mail corporativo y cargo como revisados
 //   npm run admin -- pendientes                           lista los pedidos de plan sin atender
 //   npm run admin -- hacer-admin <email>                  le da acceso a /admin/valores
+//   npm run admin -- baja <email>                         borra la cuenta y sus datos ahora (lo mismo que pedirla desde Mi perfil)
 //   npm run admin -- migrar-pedidos                       pasa los pedidos de un solo ítem al formato con ítems
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { auth, db } from './firebaseAdmin';
+import { borrarCuenta } from './bajas';
 
 const [accion, email, plan] = process.argv.slice(2);
 const uidDe = async (mail: string) => (await auth.getUserByEmail(mail)).uid;
@@ -19,6 +21,11 @@ if (accion === 'plan' && email && ['gratis', 'pro', 'empresa'].includes(plan ?? 
   const uid = await uidDe(email);
   await db.doc(`estado/${uid}`).set({ verificaciones: { idFiscal: true, mailCorporativo: true, cargoRevisado: true }, actualizado: FieldValue.serverTimestamp() }, { merge: true });
   console.log(`${email} verificado.`);
+} else if (accion === 'baja' && email) {
+  const uid = await uidDe(email);
+  await borrarCuenta(db, auth, uid);
+  await db.doc(`bajas/${uid}`).delete();
+  console.log(`Cuenta de ${email} borrada.`);
 } else if (accion === 'hacer-admin' && email) {
   const uid = await uidDe(email);
   await db.doc(`admins/${uid}`).set({ email, desde: FieldValue.serverTimestamp() });
@@ -49,6 +56,6 @@ if (accion === 'plan' && email && ['gratis', 'pro', 'empresa'].includes(plan ?? 
     console.log(`${u.email} pidió el plan ${d.data().plan} el ${d.data().pedido?.toDate().toLocaleString('es-AR')}`);
   }
 } else {
-  console.log('Uso:\n  npm run admin -- plan <email> <gratis|pro|empresa>\n  npm run admin -- verificar <email>\n  npm run admin -- pendientes\n  npm run admin -- hacer-admin <email>\n  npm run admin -- migrar-pedidos');
+  console.log('Uso:\n  npm run admin -- plan <email> <gratis|pro|empresa>\n  npm run admin -- verificar <email>\n  npm run admin -- pendientes\n  npm run admin -- baja <email>\n  npm run admin -- hacer-admin <email>\n  npm run admin -- migrar-pedidos');
   process.exit(1);
 }

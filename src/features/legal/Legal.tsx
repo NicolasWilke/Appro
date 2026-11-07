@@ -75,13 +75,13 @@ export function Privacidad() {
       </ul>
 
       <h2>5. Tus derechos</h2>
-      <p>Conforme a la {REGION.leyDatos}, tenés derecho a acceder, rectificar, actualizar o pedir la supresión de tus datos. Podés hacerlo editando tu perfil en {N} o <Contacto />. La Agencia de Acceso a la Información Pública ({REGION.autoridadDatos}) es el órgano de control y podés presentar un reclamo ante ella si lo considerás necesario.</p>
+      <p>Conforme a la {REGION.leyDatos}, tenés derecho a acceder, rectificar, actualizar o pedir la supresión de tus datos. Podés hacerlo desde Mi perfil en {N}: editás tus datos, descargás una copia con «Descargar mis datos» o borrás todo con «Eliminar mi cuenta». La Agencia de Acceso a la Información Pública ({REGION.autoridadDatos}) es el órgano de control y podés presentar un reclamo ante ella si lo considerás necesario.</p>
 
       <h2>6. Seguridad</h2>
       <p>Tomamos medidas razonables para proteger tus datos: reglas de acceso en la base que limitan qué puede leer cada cuenta, contraseñas que nunca vemos y conexiones cifradas. Ninguna plataforma puede garantizar una seguridad absoluta, y seguimos reforzando estas protecciones a medida que {N} crece.</p>
 
       <h2>7. Cuánto tiempo guardamos tus datos</h2>
-      <p>Mientras tu cuenta esté activa. Si querés eliminar tu cuenta y tus datos, pedilo <Contacto />. Las referencias de precios ya agregadas y anonimizadas pueden conservarse porque no te identifican.</p>
+      <p>Mientras tu cuenta esté activa. Si eliminás tu cuenta desde Mi perfil, en la media hora siguiente borramos tu perfil, tu contacto, tus solicitudes, tus pedidos y tus ofertas en pedidos abiertos, las reseñas y tu usuario. Las ofertas que ya mandaste a pedidos cerrados quedan en el historial de quien las recibió, sin tu perfil, y las referencias de precios ya agregadas y anonimizadas pueden conservarse porque no te identifican.</p>
 
       <h2>8. Cambios en esta política</h2>
       <p>Podemos actualizar esta política a medida que la plataforma evolucione. Vamos a avisar los cambios relevantes dentro del sitio. Ver también los <Link className="enlace" to="/terminos">Términos y condiciones</Link>.</p>

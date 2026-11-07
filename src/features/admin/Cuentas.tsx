@@ -20,7 +20,10 @@ export function Cuentas() {
   const [rol, setRol] = useState<'proveedor' | 'comprador' | ''>('proveedor');
   const { data, cargando, error } = useQuery(async (r) => {
     const admin = await r.esAdmin(cuenta!.uid);
-    return { admin, cuentas: admin ? await r.cuentasAdmin() : [] };
+    if (!admin) return { admin, cuentas: [], espera: null };
+    // Con las reglas viejas publicadas, la lista de espera no se lee: el resto del panel sigue andando.
+    const [cuentas, espera] = await Promise.all([r.cuentasAdmin(), r.listaEspera().catch(() => null)]);
+    return { admin, cuentas, espera };
   }, [cuenta?.uid]);
 
   if (error) {
@@ -65,6 +68,14 @@ export function Cuentas() {
         {pendientes.length === 0
           ? <p className="tenue">No hay pedidos sin atender.</p>
           : <ul className="admin-cuentas">{pendientes.map((c) => <Pendiente key={c.id} c={c} />)}</ul>}
+      </Seccion>
+
+      <Seccion titulo={`Lista de espera del plan Equipo${data.espera?.length ? ` · ${data.espera.length}` : ''}`}>
+        {data.espera === null
+          ? <p className="tenue">No se pudo leer. Publicá las reglas nuevas de Firestore (firebase/firestore.rules).</p>
+          : data.espera.length === 0
+            ? <p className="tenue">Todavía no se anotó ningún comprador.</p>
+            : <ul className="admin-cuentas">{data.espera.map((e) => <li key={e.uid}><strong>{e.empresa}</strong> <span className="tenue">· se anotó el {fechaCorta(e.anotado)}</span></li>)}</ul>}
       </Seccion>
 
       <Seccion titulo="Todas las cuentas">

@@ -99,6 +99,15 @@ export interface Repository {
   /** 'activo': se aplicó ya (demo). 'solicitado': lo activa el equipo al confirmar el cobro. */
   cambiarPlan(proveedorId: string, plan: PlanId): Promise<'activo' | 'solicitado'>;
   embudo(proveedorId: string): Promise<Embudo>;
+  /** Un comprador abrió el perfil de un proveedor: suma una vista a su embudo, sin decir quién fue. */
+  registrarVista(proveedorId: string): Promise<void>;
+  /** El proveedor anota (o desanota) que hubo reunión con un comprador que lo aceptó. */
+  marcarReunion(solicitudId: string, hubo: boolean): Promise<void>;
+  /** Lista de espera del plan Equipo (compradores). */
+  enListaEspera(compradorId: string): Promise<boolean>;
+  sumarseListaEspera(compradorId: string, empresa: string): Promise<void>;
+  /** Solo administradores: quiénes se anotaron, el más nuevo primero. */
+  listaEspera(): Promise<{ uid: string; empresa: string; anotado: string }[]>;
   /** Equipo del plan Empresa: quiénes se sumaron y qué enlaces siguen sin usar. Lo ve el titular. */
   equipo(empresaId: string): Promise<{ miembros: MiembroEquipo[]; invitaciones: InvitacionPendiente[] }>;
   /** El titular crea un enlace de un solo uso. `etiqueta` le recuerda para quién era. */

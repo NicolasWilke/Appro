@@ -1,5 +1,5 @@
 import {
-  addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch,
+  addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, increment, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { firebase } from '@/firebase/app';
 import { planDeAvisos } from '@/domain/notificaciones';
@@ -500,8 +500,33 @@ export class FirestoreRepository implements Repository {
       this.solicitudesEnviadas(proveedorId),
       getDocs(query(collection(this.db, 'pedidos'), where('adjudicados', 'array-contains', proveedorId))),
     ]);
-    const aceptadas = enviadas.filter((s) => s.estado === 'aceptada').length;
-    return { vistas: 0, solicitudes: enviadas.length, aceptadas, reuniones: aceptadas, ganadas: ganadas.size };
+    const aceptadas = enviadas.filter((s) => s.estado === 'aceptada');
+    const vistas = await getDoc(doc(this.db, 'users', proveedorId, 'metricas', 'vistas')).then((d) => (d.data()?.total as number | undefined) ?? 0).catch(() => 0);
+    return { vistas, solicitudes: enviadas.length, aceptadas: aceptadas.length, reuniones: aceptadas.filter((s) => s.reunion).length, ganadas: ganadas.size };
+  }
+  async registrarVista(proveedorId: string) {
+    const ref = doc(this.db, 'users', proveedorId, 'metricas', 'vistas');
+    // Las reglas exigen sumar exactamente uno: se lee y se escribe en una transacción.
+    await runTransaction(this.db, async (tx) => {
+      const d = await tx.get(ref);
+      tx.set(ref, { total: ((d.data()?.total as number | undefined) ?? 0) + 1 });
+    });
+  }
+  async marcarReunion(solicitudId: string, hubo: boolean) {
+    await updateDoc(doc(this.db, 'solicitudes', solicitudId), { reunion: hubo });
+    this.tocar(undefined);
+  }
+  async enListaEspera(compradorId: string) {
+    return (await getDoc(doc(this.db, 'listaEspera', compradorId))).exists();
+  }
+  async sumarseListaEspera(compradorId: string, empresa: string) {
+    await setDoc(doc(this.db, 'listaEspera', compradorId), { plan: 'equipo', empresa, anotado: serverTimestamp() });
+    this.tocar(undefined);
+  }
+  async listaEspera() {
+    const snap = await getDocs(collection(this.db, 'listaEspera'));
+    return snap.docs.map((d) => ({ uid: d.id, empresa: d.data().empresa as string, anotado: fechaIso(d.data().anotado) }))
+      .sort((a, b) => b.anotado.localeCompare(a.anotado));
   }
 
   async reiniciarDemo() { /* no aplica con datos reales */ }

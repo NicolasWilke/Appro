@@ -3,6 +3,7 @@
 //                                  alertas por hito: ofertas nuevas, cierre en 24 h, cierre, consultas respondidas,
 //                                  adjudicación y pedidos de valor (ver server/alertas.ts)
 //   npm run avisos -- --resumen    manda los resúmenes diarios pendientes (correrlo a las 8:00)
+// En las dos, primero ejecuta las bajas de cuenta pedidas desde Mi perfil (server/bajas.ts).
 //
 // El plan Spark de Firebase no tiene Cloud Functions, así que esto corre afuera:
 // a mano, en tu compu, o programado (ver .github/workflows/avisos.yml, gratis con GitHub Actions).
@@ -12,8 +13,9 @@ import { aPedido, aPersona, type Estado } from '@/data/firestore/mapeo';
 import { mailDePedido, mailResumenDiario, planDeAvisos } from '@/domain/notificaciones';
 import type { Comprador, PedidoCotizacion, Proveedor } from '@/domain/types';
 import { crearMailSender, fallas, MailMalConfigurado } from './mail/MailSender';
-import { db } from './firebaseAdmin';
+import { auth, db } from './firebaseAdmin';
 import { mandarAlertas } from './alertas';
+import { procesarBajas } from './bajas';
 
 const URL_PUBLICA = process.env.PUBLIC_URL ?? 'http://localhost:5173';
 const mail = crearMailSender();
@@ -96,6 +98,8 @@ async function mandarResumenes() {
 }
 
 try {
+  // Antes que los mails: una cuenta dada de baja no recibe nada más.
+  await procesarBajas(db, auth);
   if (process.argv.includes('--resumen')) await mandarResumenes();
   else {
     await avisarNuevos();

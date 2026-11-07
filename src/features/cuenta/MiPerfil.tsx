@@ -12,6 +12,7 @@ import { esMailValido } from '@/domain/validaciones';
 import { t } from '@/i18n';
 import { Copiable, Pill, Seccion } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
+import { MisDatos } from './MisDatos';
 
 const mensaje = (e: unknown) => (e instanceof FalloAuth ? MENSAJES_FALLO[e.codigo] : e instanceof Error ? e.message : MENSAJES_FALLO.desconocido);
 
@@ -84,6 +85,7 @@ export function MiPerfil() {
               <button className="btn btn--ter" onClick={async () => { await auth.salir(); ir('/'); }}>Cerrar sesión</button>
             </div>
           </Seccion>
+          <MisDatos />
           <Link className="enlace" to={`/red/${c.uid}`}>Ver cómo me ven en la red</Link>
           <EnlaceAdmin />
         </div>

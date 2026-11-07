@@ -34,7 +34,7 @@ export function PedirContacto({ comprador, proveedorId, onCerrar }: { comprador:
   return (
     <Modal titulo={`Pedir contacto a ${nombre}`} onCerrar={onCerrar}>
       <form onSubmit={enviar} className="form">
-        <p className="tenue">Contá qué ofrecés y por qué encaja con lo que está comprando. Si acepta, se liberan mail, teléfono y agenda.</p>
+        <p className="tenue">Contá qué ofrecés y por qué encaja con lo que está comprando. Si acepta, se liberan su mail y su teléfono.</p>
         <label className="campo" htmlFor="motivo">
           <span>Motivo</span>
           <textarea id="motivo" rows={5} maxLength={MOTIVO_MAX} value={motivo} onChange={(e) => setMotivo(e.target.value)}

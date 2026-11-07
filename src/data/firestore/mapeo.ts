@@ -75,6 +75,7 @@ export function aCotizacion(id: string, d: Datos, itemsPedido: ItemPedido[] = []
 
 export const aSolicitud = (id: string, d: Datos): SolicitudContacto => ({
   id, proveedorId: d.proveedorId, compradorId: d.compradorId, motivo: d.motivo, estado: d.estado, creada: fechaIso(d.creada),
+  ...(d.reunion ? { reunion: true } : {}),
 });
 
 

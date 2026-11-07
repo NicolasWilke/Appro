@@ -1,5 +1,5 @@
 import { recibeOfertas } from '@/domain/rfq';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useContacto, useResponderSolicitud } from '@/auth/AuthProvider';
@@ -9,7 +9,7 @@ import { REGIONES, region } from '@/domain/catalogos';
 import { estadoVisibleParaProveedor, habilitaCanalDirecto } from '@/domain/reglas';
 import type { Comprador, Proveedor } from '@/domain/types';
 import { fmt, t } from '@/i18n';
-import { Avatar, Chip, Copiable, Estrellas, Pill, Sello, Seccion, Vacio } from '@/ui/primitivas';
+import { Avatar, Copiable, Estrellas, Pill, Sello, Seccion, Vacio } from '@/ui/primitivas';
 import { useToast } from '@/ui/Toast';
 import { FichaComprador } from './FichaComprador';
 import { PedirContacto } from './PedirContacto';
@@ -66,16 +66,29 @@ function PerfilComprador({ c }: { c: Comprador }) {
           ))}
           {pedidos && pedidos.filter((p) => recibeOfertas(p)).length === 0 && <p className="tenue">No tiene pedidos abiertos ahora.</p>}
         </Seccion>
-        {c.circulos.length > 0 && (
-          <Seccion titulo="Círculos">
-            <div className="chips">{c.circulos.map((x) => <Chip key={x}>{x}</Chip>)}</div>
-            <p className="tenue">Grupos cerrados entre compradores. Los proveedores no entran.</p>
-          </Seccion>
-        )}
       </div>
       {abierto && <PedirContacto comprador={c} proveedorId={usuarioId} onCerrar={() => setAbierto(false)} />}
     </div>
   );
+}
+
+/**
+ * Un comprador abre el perfil de un proveedor: suma una vista al embudo del proveedor.
+ * Cuenta una por comprador, proveedor y día en este navegador, para que recargar no infle el número.
+ */
+function useVistaDeComprador(proveedorId: string) {
+  const { rol, usuarioId } = useSesion();
+  const repo = useRepo();
+  useEffect(() => {
+    if (rol !== 'comprador' || !usuarioId) return;
+    const clave = `proveo:vista:${usuarioId}:${proveedorId}`;
+    const hoy = new Date().toISOString().slice(0, 10);
+    try {
+      if (localStorage.getItem(clave) === hoy) return;
+      localStorage.setItem(clave, hoy);
+    } catch { /* sin almacenamiento: cuenta igual */ }
+    repo.registrarVista(proveedorId).catch(() => { /* una vista que no se cuenta no molesta a nadie */ });
+  }, [rol, usuarioId, proveedorId, repo]);
 }
 
 function PerfilProveedor({ p }: { p: Proveedor }) {
@@ -87,6 +100,7 @@ function PerfilProveedor({ p }: { p: Proveedor }) {
   const contacto = useContacto(p);
   const esYo = usuarioId === p.id;
   const prom = promedio(p);
+  useVistaDeComprador(p.id);
   const sub = (k: 'entrega' | 'calidad' | 'facturacion') => p.resenas.length ? p.resenas.reduce((a, r) => a + r[k], 0) / p.resenas.length : 0;
 
   return (
@@ -132,7 +146,7 @@ function PerfilProveedor({ p }: { p: Proveedor }) {
           <Seccion titulo="Te pidió contacto">
             <blockquote className="motivo">{sol.motivo}</blockquote>
             <div className="acciones-sol">
-              <button className="btn btn--pri" onClick={async () => { await responder(sol, 'aceptada'); avisar(`Aceptaste. ${p.nombre} ya puede escribirte por mail y agendar.`); }}>{t.acciones.aceptar}</button>
+              <button className="btn btn--pri" onClick={async () => { await responder(sol, 'aceptada'); avisar(`Aceptaste. ${p.nombre} ya puede escribirte o llamarte.`); }}>{t.acciones.aceptar}</button>
               <button className="btn btn--sec" onClick={() => responder(sol, 'postergada')}>{t.acciones.postergar}</button>
               <button className="btn btn--ter" onClick={() => responder(sol, 'rechazada')}>{t.acciones.rechazar}</button>
             </div>

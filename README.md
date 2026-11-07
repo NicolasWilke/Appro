@@ -125,6 +125,7 @@ npm run dev                             # abrí http://localhost:5173 y registra
 npm run admin -- pendientes                       # pedidos de cambio de plan
 npm run admin -- plan mail@proveedor.com pro      # activa un plan (gratis | pro | empresa)
 npm run admin -- verificar mail@proveedor.com     # marca CUIT, mail corporativo y cargo como revisados
+npm run admin -- baja mail@empresa.com            # borra la cuenta y sus datos ya (lo mismo que pedirla desde Mi perfil)
 ```
 
 Al registrarse, el CUIT se controla con su dígito verificador y con eso el proveedor ya recibe avisos de su rubro. `verificar` es la revisión manual que suma el sello completo en el perfil.
@@ -193,6 +194,9 @@ Cuando un comprador adjudica, en el pedido aparece **Calificá a…** por cada g
 
 - **Logos:** sin Storage, el logo se achica a 256 px en WebP y se guarda dentro del perfil (máximo ~150 KB, lo controlan las reglas). Con Blaze, `VITE_FIREBASE_STORAGE=true` y `npx firebase deploy --only storage` los pasa a Storage.
 - **Cupos de los planes:** la app los respeta, pero un usuario con conocimientos técnicos podría saltearlos llamando a Firestore directo. Controlarlos en el servidor necesita Cloud Functions (Blaze).
+- **Baja de cuenta (Ley 25.326):** desde Mi perfil, «Eliminar mi cuenta» deja `bajas/{uid}` y cierra la sesión. El script de avisos (cada 30 minutos) la ejecuta antes de mandar mails: ver `server/bajas.ts` para qué se borra. «Descargar mis datos» baja un JSON desde el navegador.
+- **Embudo del proveedor:** cada comprador que abre su perfil suma una vista (`users/{uid}/metricas/vistas`, un contador sin nombres; una por comprador y día en ese navegador). Las reuniones las anota el proveedor en cada solicitud aceptada.
+- **Lista de espera del plan Equipo:** los compradores se anotan desde Planes (`listaEspera/{uid}`); la ves en /admin.
 - **Cambio de plan:** el proveedor lo pide desde Planes y queda en `solicitudesPlan`. Lo activás vos con `npm run admin -- plan` después de cobrar.
 
 ### Probar sin tocar el proyecto real
@@ -208,7 +212,7 @@ npm run test:reglas                      # prueba las reglas
 ### Dónde está
 
 - `firebase/firestore.rules`: quién lee y escribe qué, comentado en castellano. `firebase/firestore.indexes.json`: índices.
-- `tests/reglas/`: 68 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
+- `tests/reglas/`: 73 tests de las reglas contra el emulador (contacto solo tras aceptar, un proveedor no ve el precio de otro, solo el comprador adjudica, sobre cerrado hasta el cierre, pedidos privados solo para invitados, rol y CUIT fijos, plan y verificación solo desde el servidor, etc.).
 - `src/data/firestore/`: el repositorio de datos sobre Firestore. Implementa la misma interfaz que la demo, así que las pantallas no cambian.
 - `src/domain/acceso.ts`: la política de contacto, para que la interfaz no muestre lo que las reglas igual bloquean. Si cambia una, cambia la otra.
 - `src/auth/`: `DemoAuth` y `firebase/FirebaseAuth`. Firebase se carga aparte, así que la demo no lo incluye.

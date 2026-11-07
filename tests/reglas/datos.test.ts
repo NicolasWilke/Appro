@@ -652,3 +652,49 @@ describe('equipo del plan Empresa', () => {
     await assertFails(deleteDoc(doc(como('prov1'), 'miembros', 'm1')));
   });
 });
+
+describe('embudo: vistas y reuniones', () => {
+  const vistas = (uid: string, prov = 'prov1') => doc(como(uid), 'users', prov, 'metricas', 'vistas');
+  it('un comprador suma de a una vista; un proveedor, no', async () => {
+    await assertSucceeds(setDoc(vistas('comp1'), { total: 1 }));
+    await assertSucceeds(setDoc(vistas('comp2'), { total: 2 }));
+    await assertFails(setDoc(vistas('comp1'), { total: 5 }));
+    await assertFails(setDoc(vistas('prov2'), { total: 3 }));
+    await assertFails(setDoc(vistas('comp1', 'comp2'), { total: 1 }));
+  });
+  it('solo el proveedor lee su total, y nadie lo borra', async () => {
+    await sembrar('users/prov1/metricas/vistas', { total: 4 });
+    await assertSucceeds(getDoc(vistas('prov1')));
+    await assertFails(getDoc(vistas('comp1')));
+    await assertFails(getDoc(vistas('prov2')));
+    await assertFails(deleteDoc(vistas('prov1')));
+  });
+  it('el proveedor anota una reunión solo con la solicitud aceptada y sin tocar nada más', async () => {
+    const id = await solicitar('prov1');
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudes', id), { reunion: true }));
+    await assertSucceeds(updateDoc(doc(como('comp1'), 'solicitudes', id), { estado: 'aceptada' }));
+    await assertSucceeds(updateDoc(doc(como('prov1'), 'solicitudes', id), { reunion: true }));
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudes', id), { reunion: 'si' }));
+    await assertFails(updateDoc(doc(como('prov1'), 'solicitudes', id), { reunion: false, estado: 'pendiente' }));
+    await assertFails(updateDoc(doc(como('prov2'), 'solicitudes', id), { reunion: false }));
+  });
+});
+
+describe('baja de la cuenta y lista de espera', () => {
+  it('cada uno pide solo su propia baja, y no la cambia ni la borra', async () => {
+    await assertSucceeds(setDoc(doc(como('comp1'), 'bajas', 'comp1'), { pedida: serverTimestamp() }));
+    await assertSucceeds(getDoc(doc(como('comp1'), 'bajas', 'comp1')));
+    await assertFails(setDoc(doc(como('comp1'), 'bajas', 'prov1'), { pedida: serverTimestamp() }));
+    await assertFails(setDoc(doc(como('prov1'), 'bajas', 'prov1'), { pedida: serverTimestamp(), motivo: 'x' }));
+    await assertFails(getDoc(doc(como('prov1'), 'bajas', 'comp1')));
+    await assertFails(deleteDoc(doc(como('comp1'), 'bajas', 'comp1')));
+  });
+  it('solo un comprador se anota en la lista de espera, con el nombre de su empresa', async () => {
+    const anotar = (uid: string, empresa = 'Empresa comprador') => setDoc(doc(como(uid), 'listaEspera', uid), { plan: 'equipo', empresa, anotado: serverTimestamp() });
+    await assertSucceeds(anotar('comp1'));
+    await assertFails(anotar('comp2', 'Otra'));
+    await assertFails(anotar('prov1', 'Empresa proveedor'));
+    await assertFails(getDoc(doc(como('comp2'), 'listaEspera', 'comp1')));
+    await assertSucceeds(getDoc(doc(como('comp1'), 'listaEspera', 'comp1')));
+  });
+});

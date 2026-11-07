@@ -118,6 +118,17 @@ export class DemoAuth implements AuthService {
     this.emitir();
   }
 
+  async pedirBaja() {
+    await this.listo;
+    const r = this.mio();
+    const k = Object.keys(this.estado.cuentas).find((x) => this.estado.cuentas[x] === r)!;
+    delete this.estado.cuentas[k];
+    if (this.estado.aceptados) delete this.estado.aceptados[r.uid];
+    this.estado.sesion = null;
+    this.guardar();
+    this.emitir();
+  }
+
   async restablecerPassword(_email: string) {
     // En la demo no sale ningún mail. Firebase manda el enlace real.
     await new Promise((ok) => setTimeout(ok, 400));

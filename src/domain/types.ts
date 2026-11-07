@@ -76,6 +76,8 @@ export interface SolicitudContacto {
   motivo: string;
   estado: EstadoSolicitud;
   creada: string;
+  /** El proveedor anotó que hubo reunión después de que lo aceptaron (cuenta en su embudo). */
+  reunion?: boolean;
 }
 
 /** Un renglón del pedido: lo que el comprador fija y el proveedor no puede cambiar. */

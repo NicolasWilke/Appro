@@ -14,7 +14,7 @@ const PASOS = [
   { t: 'Perfil público', d: 'Nombre, apellido, cargo, empresa y rubros. El comprador lo autoriza al registrarse.' },
   { t: 'Solicitud con motivo', d: 'El proveedor explica la oferta en 300 caracteres. Cada plan tiene un cupo mensual.' },
   { t: 'Respuesta en un toque', d: 'Acepto, más adelante o no me interesa. El rechazo es anónimo.' },
-  { t: 'Canal directo', d: 'Se liberan mail, teléfono y agenda. Queda registro para reseñas.' },
+  { t: 'Canal directo', d: 'Se liberan mail y teléfono. Queda registro para reseñas.' },
 ];
 
 export function Landing() {
@@ -77,7 +77,7 @@ export function Landing() {
             <li>Publicás una necesidad una vez y recibís cotizaciones comparables, no 30 PDF distintos.</li>
             <li>Ves {REGION.idFiscal.nombre} verificado, reseñas de otros compradores y certificaciones.</li>
             <li>Sabés si una cotización está cara en términos reales con el índice de precios por rubro.</li>
-            <li>Recibís un resumen semanal. Nada de notificaciones sueltas.</li>
+            <li>Solo te escribimos por lo tuyo: ofertas nuevas y cierres de tus pedidos.</li>
           </ul>
           <Link to="/ingresar?modo=registro&rol=comprador" className="btn btn--sec">Registrarme como comprador</Link>
         </div>
@@ -88,7 +88,7 @@ export function Landing() {
             <li>Compradores reales con nombre, empresa, rubros y ventana de compra abierta.</li>
             <li>Pedidos de cotización filtrados por tu rubro, zona y capacidad.</li>
             <li>Reputación construida con reseñas de compradores verificados.</li>
-            <li>Tu embudo medido: vistas, solicitudes aceptadas, reuniones y cotizaciones ganadas.</li>
+            <li>Tu embudo medido: vistas de compradores, solicitudes aceptadas, reuniones y cotizaciones ganadas.</li>
           </ul>
           <Link to="/planes" className="btn btn--sec">Ver planes para proveedores</Link>
         </div>
