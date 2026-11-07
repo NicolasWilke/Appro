@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSesion } from '@/app/session';
 import { useQuery } from '@/data/DataProvider';
-import { REGIONES, RUBROS, region as regionDe, rubro } from '@/domain/catalogos';
+import { REGIONES, RUBROS, region as regionDe } from '@/domain/catalogos';
 import type { FuenteValor, RegionId, RubroId, TipoValor } from '@/domain/types';
 import { ajustar, estimarTotal, factorInflacion, tieneValor, valoresPara } from '@/domain/valores';
 import { fmt } from '@/i18n';
@@ -35,9 +35,15 @@ export function ValoresReferencia() {
     const ultimo = data.mesesIso[data.mesesIso.length - 1];
     return valoresPara(data.valores, { rubro: rub || undefined, region: reg || undefined, tipo: tipo || undefined }).map((v) => {
       const factor = ajustado ? factorInflacion(v.fecha, data.mesesIso, data.inflacion) : 1;
-      return { original: v, v: ajustar(v, factor), factor, viejo: !!v.fecha && !!ultimo && v.fecha !== ultimo };
+      return { original: v, v: ajustar(v, factor), factor, viejo: !!v.fecha && !!ultimo && v.fecha < ultimo };
     });
   }, [data, rub, reg, tipo, ajustado]);
+
+  // Agrupado por sector: arriba los sectores con más valores cargados y, dentro de cada uno, primero los que tienen valor.
+  const cargados = (fs: typeof filas) => fs.filter((f) => tieneValor(f.v)).length;
+  const sectores = RUBROS.map((r) => ({ r, filas: filas.filter((f) => f.v.rubro === r.id).sort((a, b) => Number(tieneValor(b.v)) - Number(tieneValor(a.v))) }))
+    .filter((s) => s.filas.length > 0)
+    .sort((a, b) => cargados(b.filas) - cargados(a.filas));
 
   if (!data) return <div className="envoltura pagina" />;
   // Sin serie de inflación cargada (base recién creada) no se ofrece el ajuste.
@@ -80,28 +86,33 @@ export function ValoresReferencia() {
       <div className="valores">
         <div className="valores__lista">
           {filas.length === 0 && <Vacio titulo="No hay valores con esos filtros">Probá con todas las regiones o con otro tipo.</Vacio>}
-          {filas.map(({ v, original, factor, viejo }) => (
-            <article key={v.id} className={`valor ${calc?.v.id === v.id ? 'is-sel' : ''}`}>
-              <div className="valor__cab">
-                <div>
-                  <h3>{v.concepto}</h3>
-                  <p className="tenue">{rubro(v.rubro).nombre} · {v.region === 'nacional' ? 'Nacional' : regionDe(v.region).nombre}</p>
-                </div>
-                <span className="valor__unidad mono">por {v.unidad}</span>
-              </div>
-              <RangoValor v={v} />
-              {(v.fuente || tieneValor(v)) && (
-                <div className="valor__pie">
-                  <span className="valor__fuente">
-                    {v.fuente && <Pill tono={FUENTE[v.fuente].tono}>{FUENTE[v.fuente].texto}</Pill>}
-                    {v.fuenteDetalle && <span className="tenue">{v.fuenteDetalle}</span>}
-                    {v.fecha && <span className="tenue">{v.muestras ? `${v.muestras} cotizaciones · ` : ''}actualizado {mes(v.fecha)}{viejo && ajustado ? ` · ajustado ${fmt.pct((factor - 1) * 100)}` : ''}</span>}
-                  </span>
-                  {tieneValor(v) && <button type="button" className="enlace" onClick={() => setCalcId(v.id)}>Calcular un requerimiento</button>}
-                </div>
-              )}
-              {viejo && !ajustado && original.fecha && <p className="nota">Valor de {mes(original.fecha)} sin ajustar.</p>}
-            </article>
+          {sectores.map(({ r, filas: delSector }) => (
+            <section key={r.id} className="valores__sector" aria-labelledby={`sector-${r.id}`}>
+              <h2 id={`sector-${r.id}`} className="valores__sector-tit">{r.nombre} <span className="tenue">· {delSector.length} {delSector.length === 1 ? 'valor' : 'valores'}</span></h2>
+              {delSector.map(({ v, original, factor, viejo }) => (
+                <article key={v.id} className={`valor ${calc?.v.id === v.id ? 'is-sel' : ''}`}>
+                  <div className="valor__cab">
+                    <div>
+                      <h3>{v.concepto}</h3>
+                      <p className="tenue">{v.region === 'nacional' ? 'Nacional' : regionDe(v.region).nombre}</p>
+                    </div>
+                    <span className="valor__unidad mono">por {v.unidad}</span>
+                  </div>
+                  <RangoValor v={v} />
+                  {(v.fuente || tieneValor(v)) && (
+                    <div className="valor__pie">
+                      <span className="valor__fuente">
+                        {v.fuente && <Pill tono={FUENTE[v.fuente].tono}>{FUENTE[v.fuente].texto}</Pill>}
+                        {v.fuenteDetalle && <span className="tenue">{v.fuenteDetalle}</span>}
+                        {v.fecha && <span className="tenue">{v.muestras ? `${v.muestras} cotizaciones · ` : ''}actualizado {mes(v.fecha)}{viejo && ajustado ? ` · ajustado ${fmt.pct((factor - 1) * 100)}` : ''}</span>}
+                      </span>
+                      {tieneValor(v) && <button type="button" className="enlace" onClick={() => setCalcId(v.id)}>Calcular un requerimiento</button>}
+                    </div>
+                  )}
+                  {viejo && !ajustado && original.fecha && <p className="nota">Valor de {mes(original.fecha)} sin ajustar.</p>}
+                </article>
+              ))}
+            </section>
           ))}
         </div>
 

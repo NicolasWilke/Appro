@@ -8,6 +8,7 @@ export const RUBROS: Rubro[] = [
   { id: 'quimicos', nombre: 'Insumos químicos', unidad: 'litros' },
   { id: 'cargas', nombre: 'Transporte de cargas', unidad: 'km' },
   { id: 'seguridad', nombre: 'Seguridad privada', unidad: 'horas vigilador' },
+  { id: 'limpieza', nombre: 'Limpieza', unidad: 'horas operario' },
 ];
 
 export const REGIONES: Region[] = [

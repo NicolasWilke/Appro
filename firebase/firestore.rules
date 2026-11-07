@@ -61,7 +61,7 @@ service cloud.firestore {
       return !(campo in d) || (d[campo] is string && d[campo].size() <= max);
     }
     function rubroValido(r) {
-      return r in ['packaging', 'frio', 'mantenimiento', 'etiquetas', 'quimicos', 'cargas', 'seguridad'];
+      return r in ['packaging', 'frio', 'mantenimiento', 'etiquetas', 'quimicos', 'cargas', 'seguridad', 'limpieza'];
     }
     function sinCambios(campos) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(campos);
